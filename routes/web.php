@@ -43,15 +43,3 @@ Route::middleware(['auth'])->group(function () {
          ->name('client.dashboard');
 });
 
-// Temporary test routes (remove after testing)
-Route::get('/test/admin-dashboard', function () {
-    return view('dashboards.admin');
-});
-
-Route::get('/test/coop-dashboard', function () {
-    return view('dashboards.coop');
-});
-
-Route::get('/test/client-dashboard', function () {
-    return view('dashboards.client');
-});
