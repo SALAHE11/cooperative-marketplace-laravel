@@ -44,6 +44,31 @@
                     </h5>
                 </div>
                 <div class="card-body">
+                    <!-- Logo Section -->
+                    @if($cooperative->logo_path)
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h6 class="text-primary mb-3">
+                                <i class="fas fa-image me-2"></i>
+                                Logo de la Coopérative
+                            </h6>
+                            <div class="logo-display-container text-center">
+                                <div class="logo-frame">
+                                    <img src="{{ Storage::url($cooperative->logo_path) }}"
+                                         alt="Logo {{ $cooperative->name }}"
+                                         class="cooperative-logo"
+                                         onclick="showLogoModal('{{ Storage::url($cooperative->logo_path) }}', '{{ $cooperative->name }}')">
+                                </div>
+                                <small class="text-muted d-block mt-2">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Cliquez pour agrandir
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    <hr>
+                    @endif
+
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <strong>Nom:</strong>
@@ -65,15 +90,15 @@
                             <strong>Email:</strong>
                             <p>
                                 <a href="mailto:{{ $cooperative->email }}">{{ $cooperative->email }}</a>
-        <br>
-        @if($cooperative->email_verified_at)
-            <span class="badge bg-success">
-                <i class="fas fa-check"></i>
-                Vérifié le {{ $cooperative->email_verified_at->format('d/m/Y') }}
-            </span>
-        @else
-            <span class="badge bg-warning">Email non vérifié</span>
-        @endif
+                                <br>
+                                @if($cooperative->email_verified_at)
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check"></i>
+                                        Vérifié le {{ $cooperative->email_verified_at->format('d/m/Y') }}
+                                    </span>
+                                @else
+                                    <span class="badge bg-warning">Email non vérifié</span>
+                                @endif
                             </p>
                         </div>
                         <div class="col-md-6 mb-3">
@@ -235,7 +260,22 @@
     </div>
 </div>
 
-<!-- Modals -->
+<!-- Logo Modal -->
+<div class="modal fade" id="logoModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="logoModalTitle">Logo de la Coopérative</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="logoModalImage" src="" alt="" class="img-fluid rounded">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Action Modals (unchanged, keeping existing modals for approve/reject/request info) -->
 <!-- Approve Modal -->
 <div class="modal fade" id="approveModal" tabindex="-1">
     <div class="modal-dialog">
@@ -340,6 +380,47 @@
         </div>
     </div>
 </div>
+
+<style>
+.logo-display-container {
+    max-width: 300px;
+    margin: 0 auto;
+}
+
+.logo-frame {
+    width: 200px;
+    height: 200px;
+    margin: 0 auto;
+    border: 3px solid #e9ecef;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.logo-frame:hover {
+    border-color: #007bff;
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    transform: translateY(-2px);
+}
+
+.cooperative-logo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.cooperative-logo:hover {
+    transform: scale(1.05);
+}
+
+#logoModalImage {
+    max-height: 500px;
+    max-width: 100%;
+}
+</style>
 @endsection
 
 @push('scripts')
@@ -356,6 +437,15 @@ function rejectCooperative(cooperativeId) {
 
 function requestInfo() {
     const modal = new bootstrap.Modal(document.getElementById('requestInfoModal'));
+    modal.show();
+}
+
+function showLogoModal(logoUrl, cooperativeName) {
+    document.getElementById('logoModalImage').src = logoUrl;
+    document.getElementById('logoModalImage').alt = 'Logo ' + cooperativeName;
+    document.getElementById('logoModalTitle').textContent = 'Logo de ' + cooperativeName;
+
+    const modal = new bootstrap.Modal(document.getElementById('logoModal'));
     modal.show();
 }
 </script>

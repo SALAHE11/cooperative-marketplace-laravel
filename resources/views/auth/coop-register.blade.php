@@ -27,7 +27,7 @@
                         </div>
                     @endif
 
-                    <form method="POST" action="{{ route('coop.register') }}" id="coopRegisterForm">
+                    <form method="POST" action="{{ route('coop.register') }}" id="coopRegisterForm" enctype="multipart/form-data">
                         @csrf
 
                         <!-- Administrator Information -->
@@ -175,6 +175,40 @@
                                 @enderror
                             </div>
 
+                            <!-- Logo Upload Section -->
+                            <div class="col-12 mb-4">
+                                <label for="logo" class="form-label">
+                                    <i class="fas fa-image me-2"></i>
+                                    Logo de la Coopérative
+                                </label>
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <div class="row align-items-center">
+                                            <div class="col-md-3 text-center">
+                                                <div id="logoPreview" class="logo-preview mb-3">
+                                                    <i class="fas fa-image fa-4x text-muted"></i>
+                                                    <p class="text-muted small mt-2">Aperçu du logo</p>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-9">
+                                                <input type="file"
+                                                       class="form-control @error('logo') is-invalid @enderror"
+                                                       id="logo"
+                                                       name="logo"
+                                                       accept="image/*">
+                                                <small class="form-text text-muted">
+                                                    <i class="fas fa-info-circle me-1"></i>
+                                                    Formats acceptés: JPG, PNG, GIF. Taille maximale: 2MB. Dimensions recommandées: 200x200px.
+                                                </small>
+                                                @error('logo')
+                                                    <div class="invalid-feedback">{{ $message }}</div>
+                                                @enderror
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div class="col-md-6 mb-3">
                                 <label for="coop_phone" class="form-label">Téléphone de la Coopérative *</label>
                                 <input type="tel"
@@ -313,6 +347,59 @@
         </div>
     </div>
 </div>
+
+<style>
+.logo-preview {
+    width: 120px;
+    height: 120px;
+    border: 2px dashed #ddd;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.logo-preview:hover {
+    border-color: #007bff;
+    background-color: #f8f9fa;
+}
+
+.logo-preview img {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 8px;
+    object-fit: cover;
+}
+
+.logo-preview.has-image {
+    border-style: solid;
+    border-color: #28a745;
+}
+
+.logo-preview .clear-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(220, 53, 69, 0.9);
+    color: white;
+    border: none;
+    font-size: 12px;
+    cursor: pointer;
+    display: none;
+}
+
+.logo-preview.has-image .clear-btn {
+    display: block;
+}
+</style>
 @endsection
 
 @push('scripts')
@@ -335,6 +422,42 @@
 
         setupPasswordToggle('togglePassword', 'password');
         setupPasswordToggle('togglePasswordConfirm', 'password_confirmation');
+
+        // Logo preview functionality
+        const logoInput = document.getElementById('logo');
+        const logoPreview = document.getElementById('logoPreview');
+
+        logoInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+
+            if (file) {
+                // Validate file size (2MB)
+                if (file.size > 2 * 1024 * 1024) {
+                    alert('Le fichier est trop volumineux. Taille maximale: 2MB');
+                    logoInput.value = '';
+                    return;
+                }
+
+                // Validate file type
+                if (!file.type.match('image.*')) {
+                    alert('Veuillez sélectionner un fichier image valide');
+                    logoInput.value = '';
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    logoPreview.innerHTML = `
+                        <img src="${e.target.result}" style="width: 100%; height: 100%; object-fit: cover;">
+                        <button type="button" class="clear-btn" onclick="clearLogo()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    `;
+                    logoPreview.classList.add('has-image');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
 
         // Form submission with loading state
         const form = document.getElementById('coopRegisterForm');
@@ -376,5 +499,17 @@
             }
         });
     });
+
+    function clearLogo() {
+        const logoInput = document.getElementById('logo');
+        const logoPreview = document.getElementById('logoPreview');
+
+        logoInput.value = '';
+        logoPreview.innerHTML = `
+            <i class="fas fa-image fa-4x text-muted"></i>
+            <p class="text-muted small mt-2">Aperçu du logo</p>
+        `;
+        logoPreview.classList.remove('has-image');
+    }
 </script>
 @endpush

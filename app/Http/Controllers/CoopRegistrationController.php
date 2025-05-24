@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class CoopRegistrationController extends Controller
 {
@@ -39,6 +41,9 @@ class CoopRegistrationController extends Controller
             'date_created' => 'required|date',
             'sector_of_activity' => 'required|string|max:255',
             'description' => 'nullable|string',
+
+            // Logo validation
+            'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', // Max 2MB
         ]);
 
         if ($validator->fails()) {
@@ -48,6 +53,20 @@ class CoopRegistrationController extends Controller
         DB::beginTransaction();
 
         try {
+            // Handle logo upload
+            $logoPath = null;
+            if ($request->hasFile('logo')) {
+                $logoFile = $request->file('logo');
+
+                // Generate unique filename
+                $filename = time() . '_' . Str::slug($request->coop_name) . '.' . $logoFile->getClientOriginalExtension();
+
+                // Store in public/storage/cooperative-logos
+                $logoPath = $logoFile->storeAs('cooperative-logos', $filename, 'public');
+
+                Log::info('Logo uploaded successfully', ['path' => $logoPath, 'filename' => $filename]);
+            }
+
             // Create cooperative
             $cooperative = Cooperative::create([
                 'name' => $request->coop_name,
@@ -58,6 +77,7 @@ class CoopRegistrationController extends Controller
                 'date_created' => $request->date_created,
                 'sector_of_activity' => $request->sector_of_activity,
                 'description' => $request->description,
+                'logo_path' => $logoPath,
                 'status' => 'pending',
             ]);
 
@@ -125,6 +145,18 @@ class CoopRegistrationController extends Controller
 
         } catch (\Exception $e) {
             DB::rollback();
+
+            // Clean up uploaded logo if transaction failed
+            if ($logoPath && Storage::disk('public')->exists($logoPath)) {
+                Storage::disk('public')->delete($logoPath);
+                Log::info('Cleaned up logo file after transaction failure', ['path' => $logoPath]);
+            }
+
+            Log::error('Cooperative registration failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return back()->withErrors(['error' => $e->getMessage()])->withInput();
         }
     }
@@ -174,85 +206,29 @@ class CoopRegistrationController extends Controller
         DB::beginTransaction();
 
         try {
-            // Debug: Log the verification data
-            Log::info('User Verification Data:', [
-                'user_verification_id' => $userVerification->id,
-                'user_id_from_verification' => $userVerification->user_id,
-                'cooperative_id_from_verification' => $userVerification->cooperative_id,
-                'user_email' => $userVerification->email
-            ]);
-
-            Log::info('Coop Verification Data:', [
-                'coop_verification_id' => $coopVerification->id,
-                'user_id_from_verification' => $coopVerification->user_id,
-                'cooperative_id_from_verification' => $coopVerification->cooperative_id,
-                'coop_email' => $coopVerification->email
-            ]);
-
             // Mark verification records as verified
             $userVerification->update(['is_verified' => true]);
             $coopVerification->update(['is_verified' => true]);
 
-            // Find and update user using multiple methods
-            $user = null;
-
-            // Method 1: Try from user verification record
-            if ($userVerification->user_id) {
-                $user = User::find($userVerification->user_id);
-                Log::info('User found via user_verification:', ['user_id' => $user?->id]);
-            }
-
-            // Method 2: Try from cooperative verification record (fallback)
-            if (!$user && $coopVerification->user_id) {
-                $user = User::find($coopVerification->user_id);
-                Log::info('User found via coop_verification:', ['user_id' => $user?->id]);
-            }
-
-            // Method 3: Find by email (last resort)
-            if (!$user) {
-                $user = User::where('email', $request->user_email)->first();
-                Log::info('User found via email search:', ['user_id' => $user?->id]);
-            }
-
+            // Find and update user
+            $user = User::find($userVerification->user_id);
             if (!$user) {
                 throw new \Exception('Utilisateur introuvable');
             }
 
             // Update user email verification
             $user->markEmailAsVerified();
-            Log::info('User email marked as verified:', [
-                'user_id' => $user->id,
-                'email_verified_at' => $user->fresh()->email_verified_at
-            ]);
 
             // Find and update cooperative
-            $cooperative = null;
-
-            // Method 1: Try from verification record
-            if ($coopVerification->cooperative_id) {
-                $cooperative = Cooperative::find($coopVerification->cooperative_id);
-            }
-
-            // Method 2: Find by email (fallback)
-            if (!$cooperative) {
-                $cooperative = Cooperative::where('email', $request->coop_email)->first();
-            }
-
+            $cooperative = Cooperative::find($coopVerification->cooperative_id);
             if (!$cooperative) {
                 throw new \Exception('Coopérative introuvable');
             }
 
             // Update cooperative email verification
-            $coopUpdateResult = $cooperative->update(['email_verified_at' => now()]);
-            Log::info('Cooperative update result:', [
-                'success' => $coopUpdateResult,
-                'cooperative_id' => $cooperative->id,
-                'email_verified_at' => $cooperative->fresh()->email_verified_at
-            ]);
+            $cooperative->update(['email_verified_at' => now()]);
 
             DB::commit();
-
-            Log::info('Verification completed successfully');
 
             return redirect()->route('login')
                             ->with('success', 'Emails vérifiés avec succès! Votre demande d\'inscription est en cours d\'examen par l\'administrateur. Vous recevrez une réponse sur l\'email de la coopérative.');

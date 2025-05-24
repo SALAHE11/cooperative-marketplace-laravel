@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class Cooperative extends Model
 {
@@ -16,17 +17,17 @@ class Cooperative extends Model
         'address',
         'phone',
         'email',
-        'email_verified_at',  // Add this line
+        'email_verified_at',
         'logo_path',
         'description',
         'sector_of_activity',
         'status',
-        'rejection_reason',  // Add this line
+        'rejection_reason',
     ];
 
     protected $casts = [
         'date_created' => 'date',
-        'email_verified_at' => 'datetime',  // Add this line
+        'email_verified_at' => 'datetime',
     ];
 
     public function users()
@@ -54,9 +55,36 @@ class Cooperative extends Model
         return $this->hasOne(User::class)->where('role', 'cooperative_admin');
     }
 
-     // Add helper method to check if cooperative email is verified
+    // Helper method to check if cooperative email is verified
     public function isEmailVerified()
     {
         return !is_null($this->email_verified_at);
+    }
+
+    // Helper method to get logo URL
+    public function getLogoUrlAttribute()
+    {
+        if ($this->logo_path) {
+            return Storage::url($this->logo_path);
+        }
+        return null;
+    }
+
+    // Helper method to check if logo exists
+    public function hasLogo()
+    {
+        return !empty($this->logo_path) && Storage::disk('public')->exists($this->logo_path);
+    }
+
+    // Clean up logo when cooperative is deleted
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::deleting(function ($cooperative) {
+            if ($cooperative->logo_path && Storage::disk('public')->exists($cooperative->logo_path)) {
+                Storage::disk('public')->delete($cooperative->logo_path);
+            }
+        });
     }
 }
