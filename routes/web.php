@@ -43,3 +43,17 @@ Route::middleware(['auth'])->group(function () {
          ->name('client.dashboard');
 });
 
+// Admin routes for cooperative management
+Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/cooperatives', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'index'])
+         ->name('cooperatives.index');
+    Route::get('/cooperatives/{cooperative}', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'show'])
+         ->name('cooperatives.show');
+    Route::patch('/cooperatives/{cooperative}/approve', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'approve'])
+         ->name('cooperatives.approve');
+    Route::patch('/cooperatives/{cooperative}/reject', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'reject'])
+         ->name('cooperatives.reject');
+    Route::post('/cooperatives/{cooperative}/request-info', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'requestInfo'])
+         ->name('cooperatives.request-info');
+});
+

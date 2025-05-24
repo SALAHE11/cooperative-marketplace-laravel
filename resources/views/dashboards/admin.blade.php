@@ -97,69 +97,84 @@
     <!-- Content Row -->
     <div class="row">
         <!-- Pending Cooperatives -->
-        <div class="col-lg-8 mb-4">
-            <div class="card shadow">
-                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-primary">Demandes d'Inscription en Attente</h6>
-                    <div class="dropdown no-arrow">
-                        <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-bs-toggle="dropdown">
-                            <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
-                        </a>
-                        <div class="dropdown-menu dropdown-menu-right shadow">
-                            <a class="dropdown-item" href="#">Voir tout</a>
-                            <a class="dropdown-item" href="#">Exporter</a>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-bordered" width="100%" cellspacing="0">
-                            <thead>
-                                <tr>
-                                    <th>Coopérative</th>
-                                    <th>Secteur</th>
-                                    <th>Administrateur</th>
-                                    <th>Date Demande</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>Coopérative Argane Essaouira</td>
-                                    <td>Cosmétiques</td>
-                                    <td>Fatima Zahra</td>
-                                    <td>22/05/2025</td>
-                                    <td>
-                                        <button class="btn btn-success btn-sm">Approuver</button>
-                                        <button class="btn btn-danger btn-sm">Rejeter</button>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>Coopérative Tapis Azrou</td>
-                                    <td>Artisanat</td>
-                                    <td>Mohammed Rachid</td>
-                                    <td>21/05/2025</td>
-                                    <td>
-                                        <button class="btn btn-success btn-sm">Approuver</button>
-                                        <button class="btn btn-danger btn-sm">Rejeter</button>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>Coopérative Miel Atlas</td>
-                                    <td>Alimentaire</td>
-                                    <td>Aicha Benali</td>
-                                    <td>20/05/2025</td>
-                                    <td>
-                                        <button class="btn btn-success btn-sm">Approuver</button>
-                                        <button class="btn btn-danger btn-sm">Rejeter</button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+       <!-- Replace the existing "Pending Cooperatives" section with this -->
+    <div class="col-lg-8 mb-4">
+    <div class="card shadow">
+        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+            <h6 class="m-0 font-weight-bold text-primary">Demandes d'Inscription en Attente</h6>
+            <a href="{{ route('admin.cooperatives.index') }}" class="btn btn-primary btn-sm">
+                <i class="fas fa-list me-1"></i>
+                Gérer toutes
+            </a>
         </div>
+        <div class="card-body">
+            @php
+                $pendingCoops = \App\Models\Cooperative::with('admin')->where('status', 'pending')->latest()->take(5)->get();
+            @endphp
+
+            @if($pendingCoops->count() > 0)
+                <div class="table-responsive">
+                    <table class="table table-bordered" width="100%" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th>Coopérative</th>
+                                <th>Secteur</th>
+                                <th>Administrateur</th>
+                                <th>Vérification</th>
+                                <th>Date Demande</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($pendingCoops as $coop)
+                            <tr>
+                                <td>{{ $coop->name }}</td>
+                                <td>{{ $coop->sector_of_activity }}</td>
+                                <td>{{ $coop->admin->full_name ?? 'N/A' }}</td>
+                                <td>
+                                    <div>
+                                        @if($coop->admin && $coop->admin->email_verified_at)
+                                            <span class="badge bg-success mb-1">
+                                                <i class="fas fa-user"></i> Utilisateur ✓
+                                            </span>
+                                        @else
+                                            <span class="badge bg-warning mb-1">
+                                                <i class="fas fa-user"></i> Utilisateur ?
+                                            </span>
+                                        @endif
+                                        <br>
+                                        @if($coop->email_verified_at)
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-building"></i> Coopérative ✓
+                                            </span>
+                                        @else
+                                            <span class="badge bg-warning">
+                                                <i class="fas fa-building"></i> Coopérative ?
+                                            </span>
+                                        @endif
+                                    </div>
+                                </td>
+                                <td>{{ $coop->created_at->format('d/m/Y') }}</td>
+                                <td>
+                                    <a href="{{ route('admin.cooperatives.show', $coop) }}" class="btn btn-info btn-sm">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @else
+                <div class="text-center py-4">
+                    <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                    <h5>Aucune demande en attente</h5>
+                    <p class="text-muted">Toutes les demandes ont été traitées.</p>
+                </div>
+            @endif
+        </div>
+    </div>
+</div>
 
         <!-- Quick Actions -->
         <div class="col-lg-4 mb-4">
