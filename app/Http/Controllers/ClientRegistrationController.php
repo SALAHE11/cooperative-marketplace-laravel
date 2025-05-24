@@ -105,10 +105,8 @@ class ClientRegistrationController extends Controller
 
         // Verify email and activate user
         $user = User::find($verification->user_id);
-        $user->update([
-            'email_verified_at' => now(),
-            'status' => 'active',
-        ]);
+        $user->markEmailAsVerified();
+        $user->update(['status' => 'active']);
 
         $verification->update(['is_verified' => true]);
 

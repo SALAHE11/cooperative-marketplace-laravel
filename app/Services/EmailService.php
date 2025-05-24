@@ -17,10 +17,14 @@ class EmailService
             $mail->isSMTP();
             $mail->Host       = env('MAIL_HOST');
             $mail->SMTPAuth   = true;
-            $mail->Username   = env('MAIL_USERNAME'); // Replace with your email
-            $mail->Password   = env('MAIL_PASSWORD'); // Replace with your app password
+            $mail->Username   = env('MAIL_USERNAME');
+            $mail->Password   = env('MAIL_PASSWORD');
             $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
             $mail->Port       = env('MAIL_PORT');
+
+            // IMPORTANT: Set character encoding to UTF-8
+            $mail->CharSet = 'UTF-8';
+            $mail->Encoding = 'base64';
 
             // Recipients
             $mail->setFrom(env('MAIL_FROM_ADDRESS'), env('MAIL_FROM_NAME'));
@@ -62,60 +66,63 @@ class EmailService
         }
     }
 
-    // Add this method to your existing EmailService class
+    public static function sendNotificationEmail($email, $subject, $htmlMessage, $firstName = '')
+    {
+        $mail = new PHPMailer(true);
 
-public static function sendNotificationEmail($email, $subject, $htmlMessage, $firstName = '')
-{
-    $mail = new PHPMailer(true);
+        try {
+            // Server settings
+            $mail->isSMTP();
+            $mail->Host       = env('MAIL_HOST');
+            $mail->SMTPAuth   = true;
+            $mail->Username   = env('MAIL_USERNAME');
+            $mail->Password   = env('MAIL_PASSWORD');
+            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+            $mail->Port       = env('MAIL_PORT');
 
-    try {
-        // Server settings
-        $mail->isSMTP();
-        $mail->Host       = env('MAIL_HOST');
-        $mail->SMTPAuth   = true;
-        $mail->Username   = env('MAIL_USERNAME');
-        $mail->Password   = env('MAIL_PASSWORD');
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        $mail->Port       = env('MAIL_PORT');
+            // IMPORTANT: Set character encoding to UTF-8
+            $mail->CharSet = 'UTF-8';
+            $mail->Encoding = 'base64';
 
-        // Recipients
-        $mail->setFrom(env('MAIL_FROM_ADDRESS'), env('MAIL_FROM_NAME'));
-        $mail->addAddress($email, $firstName);
+            // Recipients
+            $mail->setFrom(env('MAIL_FROM_ADDRESS'), env('MAIL_FROM_NAME'));
+            $mail->addAddress($email, $firstName);
 
-        // Content
-        $mail->isHTML(true);
-        $mail->Subject = $subject;
-        $mail->Body    = "
-            <html>
-            <head>
-                <style>
-                    body { font-family: Arial, sans-serif; line-height: 1.6; }
-                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                    .header { background: linear-gradient(45deg, #2c5aa0, #3d6bb3); color: white; text-align: center; padding: 30px; }
-                    .content { padding: 30px; background: #f8f9fa; }
-                    .footer { text-align: center; padding: 20px; color: #6c757d; }
-                </style>
-            </head>
-            <body>
-                <div class='container'>
-                    <div class='header'>
-                        <h1>Coopérative E-commerce</h1>
+            // Content
+            $mail->isHTML(true);
+            $mail->Subject = $subject;
+            $mail->Body    = "
+                <html>
+                <head>
+                    <meta charset='UTF-8'>
+                    <style>
+                        body { font-family: Arial, sans-serif; line-height: 1.6; }
+                        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                        .header { background: linear-gradient(45deg, #2c5aa0, #3d6bb3); color: white; text-align: center; padding: 30px; }
+                        .content { padding: 30px; background: #f8f9fa; }
+                        .footer { text-align: center; padding: 20px; color: #6c757d; }
+                    </style>
+                </head>
+                <body>
+                    <div class='container'>
+                        <div class='header'>
+                            <h1>Coopérative E-commerce</h1>
+                        </div>
+                        <div class='content'>
+                            {$htmlMessage}
+                        </div>
+                        <div class='footer'>
+                            <p>&copy; " . date('Y') . " Coopérative E-commerce. Tous droits réservés.</p>
+                        </div>
                     </div>
-                    <div class='content'>
-                        {$htmlMessage}
-                    </div>
-                    <div class='footer'>
-                        <p>&copy; " . date('Y') . " Coopérative E-commerce. Tous droits réservés.</p>
-                    </div>
-                </div>
-            </body>
-            </html>
-        ";
+                </body>
+                </html>
+            ";
 
-        $mail->send();
-        return true;
-    } catch (Exception $e) {
-        return false;
+            $mail->send();
+            return true;
+        } catch (Exception $e) {
+            return false;
+        }
     }
-}
 }

@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;  // Add this import
+use Illuminate\Support\Facades\Log;
 
 class CoopRegistrationController extends Controller
 {
@@ -219,9 +219,8 @@ class CoopRegistrationController extends Controller
             }
 
             // Update user email verification
-            $userUpdateResult = $user->update(['email_verified_at' => now()]);
-            Log::info('User update result:', [
-                'success' => $userUpdateResult,
+            $user->markEmailAsVerified();
+            Log::info('User email marked as verified:', [
                 'user_id' => $user->id,
                 'email_verified_at' => $user->fresh()->email_verified_at
             ]);
