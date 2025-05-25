@@ -154,16 +154,26 @@
         <!-- Pending Cooperatives Tab -->
         <div class="tab-pane fade show active" id="pending" role="tabpanel">
             <div class="card mt-3">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fas fa-hourglass-half me-2"></i>
-                        Demandes en Attente de Validation
-                    </h5>
-                    <div>
-                        <button class="btn btn-sm btn-outline-info" onclick="toggleVerificationFilter()">
-                            <i class="fas fa-filter me-1"></i>
-                            Filtrer par vérification
-                        </button>
+                <div class="card-header">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <h5 class="mb-0">
+                                <i class="fas fa-hourglass-half me-2"></i>
+                                Demandes en Attente de Validation
+                            </h5>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="fas fa-search"></i>
+                                </span>
+                                <input type="text" class="form-control" id="pendingSearch"
+                                       placeholder="Rechercher par nom de coopérative...">
+                                <button class="btn btn-outline-secondary" type="button" onclick="clearSearch('pending')">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="card-body">
@@ -224,7 +234,7 @@
                                         $coopVerified = $cooperative->email_verified_at;
                                         $fullyVerified = $adminVerified && $coopVerified;
                                     @endphp
-                                    <tr class="{{ $fullyVerified ? 'table-success' : 'table-warning' }}">
+                                    <tr class="{{ $fullyVerified ? 'table-success' : 'table-warning' }}" data-coop-name="{{ strtolower($cooperative->name) }}">
                                         <td>
                                             <div>
                                                 <strong class="text-primary">{{ $cooperative->name }}</strong>
@@ -367,6 +377,17 @@
                             </table>
                         </div>
 
+                        <!-- No Results Message (hidden by default) -->
+                        <div id="pendingNoResults" class="text-center py-4 d-none">
+                            <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                            <h5>Aucun résultat trouvé</h5>
+                            <p class="text-muted">Aucune coopérative ne correspond à votre recherche.</p>
+                            <button class="btn btn-outline-primary" onclick="clearSearch('pending')">
+                                <i class="fas fa-times me-2"></i>
+                                Effacer la recherche
+                            </button>
+                        </div>
+
                         <!-- Pagination -->
                         <div class="d-flex justify-content-center mt-3">
                             {{ $pendingCooperatives->links() }}
@@ -390,15 +411,31 @@
         <div class="tab-pane fade" id="approved" role="tabpanel">
             <div class="card mt-3">
                 <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="fas fa-check-circle me-2"></i>
-                        Coopératives Approuvées et Actives
-                    </h5>
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <h5 class="mb-0">
+                                <i class="fas fa-check-circle me-2"></i>
+                                Coopératives Approuvées et Actives
+                            </h5>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="fas fa-search"></i>
+                                </span>
+                                <input type="text" class="form-control" id="approvedSearch"
+                                       placeholder="Rechercher par nom de coopérative...">
+                                <button class="btn btn-outline-secondary" type="button" onclick="clearSearch('approved')">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body">
                     @if($approvedCooperatives->count() > 0)
                         <div class="table-responsive">
-                            <table class="table table-hover">
+                            <table class="table table-hover" id="approvedTable">
                                 <thead class="table-success">
                                     <tr>
                                         <th>Coopérative</th>
@@ -411,7 +448,7 @@
                                 </thead>
                                 <tbody>
                                     @foreach($approvedCooperatives as $cooperative)
-                                    <tr>
+                                    <tr data-coop-name="{{ strtolower($cooperative->name) }}">
                                         <td>
                                             <div>
                                                 <strong class="text-success">{{ $cooperative->name }}</strong>
@@ -468,6 +505,17 @@
                             </table>
                         </div>
 
+                        <!-- No Results Message (hidden by default) -->
+                        <div id="approvedNoResults" class="text-center py-4 d-none">
+                            <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                            <h5>Aucun résultat trouvé</h5>
+                            <p class="text-muted">Aucune coopérative ne correspond à votre recherche.</p>
+                            <button class="btn btn-outline-primary" onclick="clearSearch('approved')">
+                                <i class="fas fa-times me-2"></i>
+                                Effacer la recherche
+                            </button>
+                        </div>
+
                         <div class="d-flex justify-content-center mt-3">
                             {{ $approvedCooperatives->links() }}
                         </div>
@@ -486,15 +534,31 @@
         <div class="tab-pane fade" id="suspended" role="tabpanel">
             <div class="card mt-3">
                 <div class="card-header">
-                    <h5 class="mb-0">
-                        <i class="fas fa-ban me-2 text-danger"></i>
-                        Coopératives Suspendues
-                    </h5>
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <h5 class="mb-0">
+                                <i class="fas fa-ban me-2 text-danger"></i>
+                                Coopératives Suspendues
+                            </h5>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="fas fa-search"></i>
+                                </span>
+                                <input type="text" class="form-control" id="suspendedSearch"
+                                       placeholder="Rechercher par nom de coopérative...">
+                                <button class="btn btn-outline-secondary" type="button" onclick="clearSearch('suspended')">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body">
                     @if($suspendedCooperatives->count() > 0)
                         <div class="table-responsive">
-                            <table class="table table-hover">
+                            <table class="table table-hover" id="suspendedTable">
                                 <thead class="table-danger">
                                     <tr>
                                         <th>Coopérative</th>
@@ -508,7 +572,7 @@
                                 </thead>
                                 <tbody>
                                     @foreach($suspendedCooperatives as $cooperative)
-                                    <tr>
+                                    <tr data-coop-name="{{ strtolower($cooperative->name) }}">
                                         <td>
                                             <div>
                                                 <strong class="text-danger">{{ $cooperative->name }}</strong>
@@ -566,6 +630,17 @@
                                     @endforeach
                                 </tbody>
                             </table>
+                        </div>
+
+                        <!-- No Results Message (hidden by default) -->
+                        <div id="suspendedNoResults" class="text-center py-4 d-none">
+                            <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                            <h5>Aucun résultat trouvé</h5>
+                            <p class="text-muted">Aucune coopérative ne correspond à votre recherche.</p>
+                            <button class="btn btn-outline-primary" onclick="clearSearch('suspended')">
+                                <i class="fas fa-times me-2"></i>
+                                Effacer la recherche
+                            </button>
                         </div>
 
                         <div class="d-flex justify-content-center mt-3">
@@ -835,6 +910,17 @@
 .modal-header.bg-danger .btn-close-white {
     filter: brightness(0) invert(1);
 }
+
+/* Search input styling */
+.input-group .form-control:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.search-highlight {
+    background-color: #fff3cd;
+    font-weight: bold;
+}
 </style>
 @endpush
 
@@ -850,7 +936,114 @@ document.addEventListener('DOMContentLoaded', function() {
         meta.content = '{{ csrf_token() }}';
         document.getElementsByTagName('head')[0].appendChild(meta);
     }
+
+    // Initialize search functionality
+    initializeSearch();
 });
+
+function initializeSearch() {
+    // Search inputs
+    const pendingSearch = document.getElementById('pendingSearch');
+    const approvedSearch = document.getElementById('approvedSearch');
+    const suspendedSearch = document.getElementById('suspendedSearch');
+
+    // Add event listeners
+    if (pendingSearch) {
+        pendingSearch.addEventListener('input', function() {
+            filterTable('pending', this.value);
+        });
+    }
+
+    if (approvedSearch) {
+        approvedSearch.addEventListener('input', function() {
+            filterTable('approved', this.value);
+        });
+    }
+
+    if (suspendedSearch) {
+        suspendedSearch.addEventListener('input', function() {
+            filterTable('suspended', this.value);
+        });
+    }
+}
+
+function filterTable(tableType, searchTerm) {
+    const table = document.getElementById(tableType + 'Table');
+    const noResults = document.getElementById(tableType + 'NoResults');
+
+    if (!table) return;
+
+    const tbody = table.querySelector('tbody');
+    const rows = tbody.querySelectorAll('tr');
+    let visibleRows = 0;
+
+    searchTerm = searchTerm.toLowerCase().trim();
+
+    rows.forEach(row => {
+        const coopName = row.getAttribute('data-coop-name');
+
+        if (!searchTerm || coopName.includes(searchTerm)) {
+            row.style.display = '';
+            visibleRows++;
+
+            // Highlight search term
+            if (searchTerm) {
+                highlightSearchTerm(row, searchTerm);
+            } else {
+                removeHighlight(row);
+            }
+        } else {
+            row.style.display = 'none';
+            removeHighlight(row);
+        }
+    });
+
+    // Show/hide no results message
+    if (noResults) {
+        if (visibleRows === 0 && searchTerm) {
+            table.style.display = 'none';
+            noResults.classList.remove('d-none');
+        } else {
+            table.style.display = '';
+            noResults.classList.add('d-none');
+        }
+    }
+
+    // Hide/show pagination when searching
+    const pagination = table.closest('.card-body').querySelector('.d-flex.justify-content-center');
+    if (pagination) {
+        pagination.style.display = searchTerm ? 'none' : '';
+    }
+}
+
+function highlightSearchTerm(row, searchTerm) {
+    const coopNameCell = row.querySelector('td:first-child strong');
+    if (coopNameCell) {
+        const originalText = coopNameCell.textContent;
+        const regex = new RegExp(`(${escapeRegExp(searchTerm)})`, 'gi');
+        const highlightedText = originalText.replace(regex, '<span class="search-highlight">$1</span>');
+        coopNameCell.innerHTML = highlightedText;
+    }
+}
+
+function removeHighlight(row) {
+    const coopNameCell = row.querySelector('td:first-child strong');
+    if (coopNameCell && coopNameCell.querySelector('.search-highlight')) {
+        coopNameCell.innerHTML = coopNameCell.textContent;
+    }
+}
+
+function escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function clearSearch(tableType) {
+    const searchInput = document.getElementById(tableType + 'Search');
+    if (searchInput) {
+        searchInput.value = '';
+        filterTable(tableType, '');
+    }
+}
 
 function approveCooperative(cooperativeId, cooperativeName) {
     document.getElementById('approveName').textContent = cooperativeName;
@@ -907,24 +1100,5 @@ function unsuspendCooperativeFromList(cooperativeId, cooperativeName) {
 function refreshPage() {
     window.location.reload();
 }
-
-function toggleVerificationFilter() {
-    const table = document.getElementById('pendingTable');
-    if (!table) return;
-
-    const rows = table.querySelectorAll('tbody tr');
-
-    rows.forEach(row => {
-        const hasSuccess = row.classList.contains('table-success');
-        if (hasSuccess) {
-            row.style.display = row.style.display === 'none' ? '' : 'none';
-        }
-    });
-}
-
-// Auto-refresh every 30 seconds (optional)
-// setInterval(() => {
-//     console.log('Auto-refresh check...');
-// }, 30000);
 </script>
 @endpush

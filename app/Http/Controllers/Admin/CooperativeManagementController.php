@@ -234,32 +234,6 @@ class CooperativeManagementController extends Controller
     }
 }
 
-public function index()
-{
-    /** @var User $user */
-    $user = Auth::user();
-
-    if (!$user->isSystemAdmin()) {
-        abort(403);
-    }
-
-    $pendingCooperatives = Cooperative::with('admin')
-        ->where('status', 'pending')
-        ->orderBy('created_at', 'desc')
-        ->paginate(10);
-
-    $approvedCooperatives = Cooperative::with('admin')
-        ->where('status', 'approved')
-        ->orderBy('updated_at', 'desc')
-        ->paginate(10);
-
-    $suspendedCooperatives = Cooperative::with(['admin', 'suspendedBy'])
-        ->where('status', 'suspended')
-        ->orderBy('suspended_at', 'desc')
-        ->paginate(10);
-
-    return view('admin.cooperatives.index', compact('pendingCooperatives', 'approvedCooperatives', 'suspendedCooperatives'));
-}
 
 public function suspend(Request $request, Cooperative $cooperative)
 {
@@ -397,5 +371,117 @@ private function sendUnsuspensionEmail(Cooperative $cooperative)
         $message,
         $cooperative->admin->first_name
     );
+}
+
+public function index(Request $request)
+{
+    /** @var User $user */
+    $user = Auth::user();
+
+    if (!$user->isSystemAdmin()) {
+        abort(403);
+    }
+
+    // Get search parameters
+    $pendingSearch = $request->get('pending_search');
+    $approvedSearch = $request->get('approved_search');
+    $suspendedSearch = $request->get('suspended_search');
+
+    // Build queries with search functionality
+    $pendingQuery = Cooperative::with('admin')->where('status', 'pending');
+    $approvedQuery = Cooperative::with('admin')->where('status', 'approved');
+    $suspendedQuery = Cooperative::with(['admin', 'suspendedBy'])->where('status', 'suspended');
+
+    // Apply search filters if provided
+    if ($pendingSearch) {
+        $pendingQuery->where('name', 'LIKE', '%' . $pendingSearch . '%');
+    }
+
+    if ($approvedSearch) {
+        $approvedQuery->where('name', 'LIKE', '%' . $approvedSearch . '%');
+    }
+
+    if ($suspendedSearch) {
+        $suspendedQuery->where('name', 'LIKE', '%' . $suspendedSearch . '%');
+    }
+
+    // Get paginated results
+    $pendingCooperatives = $pendingQuery->orderBy('created_at', 'desc')->paginate(10, ['*'], 'pending_page');
+    $approvedCooperatives = $approvedQuery->orderBy('updated_at', 'desc')->paginate(10, ['*'], 'approved_page');
+    $suspendedCooperatives = $suspendedQuery->orderBy('suspended_at', 'desc')->paginate(10, ['*'], 'suspended_page');
+
+    // Preserve search parameters in pagination links
+    if ($pendingSearch) {
+        $pendingCooperatives->appends(['pending_search' => $pendingSearch]);
+    }
+    if ($approvedSearch) {
+        $approvedCooperatives->appends(['approved_search' => $approvedSearch]);
+    }
+    if ($suspendedSearch) {
+        $suspendedCooperatives->appends(['suspended_search' => $suspendedSearch]);
+    }
+
+    return view('admin.cooperatives.index', compact(
+        'pendingCooperatives',
+        'approvedCooperatives',
+        'suspendedCooperatives'
+    ));
+}
+
+/**
+ * Search cooperatives via AJAX
+ */
+public function search(Request $request)
+{
+    /** @var User $user */
+    $user = Auth::user();
+
+    if (!$user->isSystemAdmin()) {
+        return response()->json(['error' => 'Unauthorized'], 403);
+    }
+
+    $request->validate([
+        'query' => 'required|string|min:1|max:255',
+        'status' => 'required|in:pending,approved,suspended'
+    ]);
+
+    $query = $request->get('query');
+    $status = $request->get('status');
+
+    $cooperatives = Cooperative::with('admin')
+        ->where('status', $status)
+        ->where('name', 'LIKE', '%' . $query . '%')
+        ->orderBy('created_at', 'desc')
+        ->limit(20)
+        ->get();
+
+    $results = $cooperatives->map(function ($cooperative) {
+        return [
+            'id' => $cooperative->id,
+            'name' => $cooperative->name,
+            'legal_status' => $cooperative->legal_status,
+            'sector_of_activity' => $cooperative->sector_of_activity,
+            'email' => $cooperative->email,
+            'phone' => $cooperative->phone,
+            'status' => $cooperative->status,
+            'created_at' => $cooperative->created_at->format('d/m/Y H:i'),
+            'admin' => $cooperative->admin ? [
+                'full_name' => $cooperative->admin->full_name,
+                'email' => $cooperative->admin->email,
+                'status' => $cooperative->admin->status,
+                'email_verified_at' => $cooperative->admin->email_verified_at
+            ] : null,
+            'email_verified_at' => $cooperative->email_verified_at,
+            'suspended_at' => $cooperative->suspended_at ? $cooperative->suspended_at->format('d/m/Y H:i') : null,
+            'suspension_reason' => $cooperative->suspension_reason,
+            'suspended_by' => $cooperative->suspendedBy ? $cooperative->suspendedBy->full_name : null
+        ];
+    });
+
+    return response()->json([
+        'success' => true,
+        'results' => $results,
+        'count' => $results->count()
+    ]);
 }
 }

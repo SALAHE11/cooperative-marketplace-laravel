@@ -47,6 +47,8 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/cooperatives', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'index'])
          ->name('cooperatives.index');
+    Route::get('/cooperatives/search', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'search'])
+         ->name('cooperatives.search');
     Route::get('/cooperatives/{cooperative}', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'show'])
          ->name('cooperatives.show');
     Route::patch('/cooperatives/{cooperative}/approve', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'approve'])
@@ -55,9 +57,9 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
          ->name('cooperatives.reject');
     Route::post('/cooperatives/{cooperative}/request-info', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'requestInfo'])
          ->name('cooperatives.request-info');
-         Route::post('/send-email', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'sendEmail'])
-     ->name('send-email');
-     Route::patch('/cooperatives/{cooperative}/suspend', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'suspend'])
+    Route::post('/send-email', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'sendEmail'])
+         ->name('send-email');
+    Route::patch('/cooperatives/{cooperative}/suspend', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'suspend'])
          ->name('cooperatives.suspend');
     Route::patch('/cooperatives/{cooperative}/unsuspend', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'unsuspend'])
          ->name('cooperatives.unsuspend');
