@@ -4,6 +4,7 @@
 
 @section('content')
 <div class="container-fluid py-4">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <!-- Header -->
     <div class="row mb-4">
         <div class="col-12">
@@ -32,6 +33,14 @@
         <div class="alert alert-success alert-dismissible fade show" role="alert">
             <i class="fas fa-check-circle me-2"></i>
             {{ session('success') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    @endif
+
+    @if($errors->any())
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>
+            {{ $errors->first() }}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     @endif
@@ -211,17 +220,17 @@
                 </div>
                 <div class="card-body">
                     <div class="d-grid gap-2">
-                        <button type="button" class="btn btn-success" onclick="approveCooperative({{ $cooperative->id }})">
+                        <button type="button" class="btn btn-success" onclick="approveCooperative({{ $cooperative->id }}, '{{ $cooperative->name }}')">
                             <i class="fas fa-check me-2"></i>
                             Approuver la Coopérative
                         </button>
 
-                        <button type="button" class="btn btn-warning" onclick="requestInfo()">
+                        <button type="button" class="btn btn-warning" onclick="requestInfo({{ $cooperative->id }}, '{{ $cooperative->name }}')">
                             <i class="fas fa-question-circle me-2"></i>
                             Demander des Infos
                         </button>
 
-                        <button type="button" class="btn btn-danger" onclick="rejectCooperative({{ $cooperative->id }})">
+                        <button type="button" class="btn btn-danger" onclick="rejectCooperative({{ $cooperative->id }}, '{{ $cooperative->name }}')">
                             <i class="fas fa-times me-2"></i>
                             Rejeter la Demande
                         </button>
@@ -244,7 +253,7 @@
                     <p class="text-muted mb-3">L'administrateur peut maintenant se connecter et gérer sa coopérative.</p>
 
                     <div class="d-grid">
-                        <button type="button" class="btn btn-warning" onclick="suspendCooperative({{ $cooperative->id }})">
+                        <button type="button" class="btn btn-warning" onclick="suspendCooperative({{ $cooperative->id }}, '{{ $cooperative->name }}')">
                             <i class="fas fa-ban me-2"></i>
                             Suspendre le Compte
                         </button>
@@ -267,7 +276,7 @@
                     <p class="text-muted mb-3">L'accès au tableau de bord est bloqué.</p>
 
                     <div class="d-grid">
-                        <button type="button" class="btn btn-success" onclick="unsuspendCooperative({{ $cooperative->id }})">
+                        <button type="button" class="btn btn-success" onclick="unsuspendCooperative({{ $cooperative->id }}, '{{ $cooperative->name }}')">
                             <i class="fas fa-unlock me-2"></i>
                             Lever la Suspension
                         </button>
@@ -318,6 +327,150 @@
             <div class="modal-body text-center">
                 <img id="logoModalImage" src="" alt="" class="img-fluid rounded">
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Approve Modal -->
+<div class="modal fade" id="approveModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Confirmer l'Approbation
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Attention:</strong> Cette action ne peut pas être annulée.
+                </div>
+                <p>Êtes-vous sûr de vouloir approuver la coopérative <strong id="approveName"></strong>?</p>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Actions automatiques:</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success me-2"></i>Statut coopérative: <span class="badge bg-success">Approuvée</span></li>
+                            <li><i class="fas fa-check text-success me-2"></i>Compte administrateur: <span class="badge bg-success">Activé</span></li>
+                            <li><i class="fas fa-check text-success me-2"></i>Email de confirmation envoyé</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Accès autorisés:</h6>
+                        <ul class="list-unstyled">
+                            <li><i class="fas fa-check text-success me-2"></i>Connexion au tableau de bord</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Gestion des produits</li>
+                            <li><i class="fas fa-check text-success me-2"></i>Traitement des commandes</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i>
+                    Annuler
+                </button>
+                <form id="approveForm" method="POST" style="display: inline;">
+                    @csrf
+                    @method('PATCH')
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-check me-1"></i>
+                        Confirmer l'Approbation
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reject Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-times-circle me-2"></i>
+                    Rejeter la Demande
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="rejectForm" method="POST">
+                @csrf
+                @method('PATCH')
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Attention:</strong> Cette action rejettera définitivement la demande pour <strong id="rejectName"></strong>.
+                    </div>
+                    <div class="mb-3">
+                        <label for="rejection_reason" class="form-label">
+                            <i class="fas fa-comment me-1"></i>
+                            Raison du rejet *
+                        </label>
+                        <textarea class="form-control" id="rejection_reason" name="rejection_reason"
+                                  rows="4" placeholder="Expliquez clairement pourquoi cette demande est rejetée..." required></textarea>
+                        <small class="form-text text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Cette raison sera envoyée par email au demandeur.
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>
+                        Annuler
+                    </button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-times me-1"></i>
+                        Confirmer le Rejet
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Request Info Modal -->
+<div class="modal fade" id="requestInfoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">
+                    <i class="fas fa-question-circle me-2"></i>
+                    Demander des Informations
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="requestInfoForm" method="POST">
+                @csrf
+                <div class="modal-body">
+                    <p>Demander des informations supplémentaires à <strong id="infoName"></strong>:</p>
+                    <div class="mb-3">
+                        <label for="info_requested" class="form-label">
+                            <i class="fas fa-list me-1"></i>
+                            Informations demandées *
+                        </label>
+                        <textarea class="form-control" id="info_requested" name="info_requested"
+                                  rows="4" placeholder="Décrivez précisément les informations supplémentaires nécessaires..." required></textarea>
+                        <small class="form-text text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Cette demande sera envoyée par email à la coopérative.
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>
+                        Annuler
+                    </button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-paper-plane me-1"></i>
+                        Envoyer la Demande
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -406,7 +559,7 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" action="{{ route('admin.cooperatives.suspend', $cooperative) }}">
+            <form id="suspendForm" method="POST" action="{{ route('admin.cooperatives.suspend', $cooperative) }}">
                 @csrf
                 @method('PATCH')
                 <div class="modal-body">
@@ -483,9 +636,6 @@
     </div>
 </div>
 
-<!-- Action Modals (existing approve/reject/request info modals remain the same) -->
-<!-- ... (include all existing modals) ... -->
-
 <style>
 .logo-display-container {
     max-width: 300px;
@@ -553,27 +703,48 @@
 
 @push('scripts')
 <script>
-function approveCooperative(cooperativeId) {
+// Add CSRF token to all AJAX requests
+document.addEventListener('DOMContentLoaded', function() {
+    // Setup CSRF token for all requests
+    const csrfToken = document.querySelector('meta[name="csrf-token"]');
+    if (csrfToken) {
+        window.axios.defaults.headers.common['X-CSRF-TOKEN'] = csrfToken.getAttribute('content');
+    }
+});
+
+function approveCooperative(cooperativeId, cooperativeName) {
+    document.getElementById('approveName').textContent = cooperativeName;
+    const form = document.getElementById('approveForm');
+    form.action = `/admin/cooperatives/${cooperativeId}/approve`;
+
     const modal = new bootstrap.Modal(document.getElementById('approveModal'));
     modal.show();
 }
 
-function rejectCooperative(cooperativeId) {
+function rejectCooperative(cooperativeId, cooperativeName) {
+    document.getElementById('rejectName').textContent = cooperativeName;
+    const form = document.getElementById('rejectForm');
+    form.action = `/admin/cooperatives/${cooperativeId}/reject`;
+
     const modal = new bootstrap.Modal(document.getElementById('rejectModal'));
     modal.show();
 }
 
-function requestInfo() {
+function requestInfo(cooperativeId, cooperativeName) {
+    document.getElementById('infoName').textContent = cooperativeName;
+    const form = document.getElementById('requestInfoForm');
+    form.action = `/admin/cooperatives/${cooperativeId}/request-info`;
+
     const modal = new bootstrap.Modal(document.getElementById('requestInfoModal'));
     modal.show();
 }
 
-function suspendCooperative(cooperativeId) {
+function suspendCooperative(cooperativeId, cooperativeName) {
     const modal = new bootstrap.Modal(document.getElementById('suspendModal'));
     modal.show();
 }
 
-function unsuspendCooperative(cooperativeId) {
+function unsuspendCooperative(cooperativeId, cooperativeName) {
     const modal = new bootstrap.Modal(document.getElementById('unsuspendModal'));
     modal.show();
 }
@@ -607,75 +778,77 @@ function showPhoneModal(phone) {
     modal.show();
 }
 
-// Handle email form submission (existing code)
+// Handle email form submission
 document.addEventListener('DOMContentLoaded', function() {
     const emailForm = document.getElementById('emailForm');
     const sendBtn = document.getElementById('sendEmailBtn');
 
-    emailForm.addEventListener('submit', function(e) {
-        e.preventDefault();
+    if (emailForm && sendBtn) {
+        emailForm.addEventListener('submit', function(e) {
+            e.preventDefault();
 
-        // Show loading state
-        const spinner = sendBtn.querySelector('.spinner-border');
-        const text = sendBtn.querySelector('i');
+            // Show loading state
+            const spinner = sendBtn.querySelector('.spinner-border');
+            const text = sendBtn.querySelector('i');
 
-        spinner.classList.remove('d-none');
-        sendBtn.disabled = true;
+            spinner.classList.remove('d-none');
+            sendBtn.disabled = true;
 
-        // Prepare form data
-        const formData = new FormData(emailForm);
+            // Prepare form data
+            const formData = new FormData(emailForm);
 
-        // Send email via AJAX
-        fetch('{{ route("admin.send-email") }}', {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Show success message
+            // Send email via AJAX
+            fetch('{{ route("admin.send-email") }}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show success message
+                    const alert = document.createElement('div');
+                    alert.className = 'alert alert-success alert-dismissible fade show';
+                    alert.innerHTML = `
+                        <i class="fas fa-check-circle me-2"></i>
+                        Email envoyé avec succès!
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    `;
+
+                    document.querySelector('.container-fluid').insertBefore(alert, document.querySelector('.row'));
+
+                    // Close modal
+                    bootstrap.Modal.getInstance(document.getElementById('emailModal')).hide();
+
+                    // Auto-hide alert after 5 seconds
+                    setTimeout(() => alert.remove(), 5000);
+                } else {
+                    throw new Error(data.message || 'Erreur lors de l\'envoi');
+                }
+            })
+            .catch(error => {
+                // Show error message
                 const alert = document.createElement('div');
-                alert.className = 'alert alert-success alert-dismissible fade show';
+                alert.className = 'alert alert-danger alert-dismissible fade show';
                 alert.innerHTML = `
-                    <i class="fas fa-check-circle me-2"></i>
-                    Email envoyé avec succès!
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    Erreur lors de l'envoi: ${error.message}
                     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 `;
 
-                document.querySelector('.container-fluid').insertBefore(alert, document.querySelector('.row'));
+                document.querySelector('.modal-body').insertBefore(alert, document.querySelector('.modal-body').firstChild);
 
-                // Close modal
-                bootstrap.Modal.getInstance(document.getElementById('emailModal')).hide();
-
-                // Auto-hide alert after 5 seconds
                 setTimeout(() => alert.remove(), 5000);
-            } else {
-                throw new Error(data.message || 'Erreur lors de l\'envoi');
-            }
-        })
-        .catch(error => {
-            // Show error message
-            const alert = document.createElement('div');
-            alert.className = 'alert alert-danger alert-dismissible fade show';
-            alert.innerHTML = `
-                <i class="fas fa-exclamation-circle me-2"></i>
-                Erreur lors de l'envoi: ${error.message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            `;
-
-            document.querySelector('.modal-body').insertBefore(alert, document.querySelector('.modal-body').firstChild);
-
-            setTimeout(() => alert.remove(), 5000);
-        })
-        .finally(() => {
-            // Hide loading state
-            spinner.classList.add('d-none');
-            sendBtn.disabled = false;
+            })
+            .finally(() => {
+                // Hide loading state
+                spinner.classList.add('d-none');
+                sendBtn.disabled = false;
+            });
         });
-    });
+    }
 });
 </script>
 @endpush

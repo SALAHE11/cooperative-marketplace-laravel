@@ -840,6 +840,18 @@
 
 @push('scripts')
 <script>
+// Setup CSRF token
+document.addEventListener('DOMContentLoaded', function() {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]');
+    if (!csrfToken) {
+        // Add CSRF meta tag if not present
+        const meta = document.createElement('meta');
+        meta.name = 'csrf-token';
+        meta.content = '{{ csrf_token() }}';
+        document.getElementsByTagName('head')[0].appendChild(meta);
+    }
+});
+
 function approveCooperative(cooperativeId, cooperativeName) {
     document.getElementById('approveName').textContent = cooperativeName;
     const form = document.getElementById('approveForm');
@@ -876,10 +888,18 @@ function showSuspensionReason(reason, date) {
 }
 
 function unsuspendCooperativeFromList(cooperativeId, cooperativeName) {
+    console.log('Unsuspending cooperative:', cooperativeId, cooperativeName); // Debug log
+
+    // Update modal content
     document.getElementById('unsuspendCoopName').textContent = cooperativeName;
+
+    // Update form action
     const form = document.getElementById('unsuspendFromListForm');
     form.action = `/admin/cooperatives/${cooperativeId}/unsuspend`;
 
+    console.log('Form action set to:', form.action); // Debug log
+
+    // Show modal
     const modal = new bootstrap.Modal(document.getElementById('unsuspendFromListModal'));
     modal.show();
 }
@@ -890,6 +910,8 @@ function refreshPage() {
 
 function toggleVerificationFilter() {
     const table = document.getElementById('pendingTable');
+    if (!table) return;
+
     const rows = table.querySelectorAll('tbody tr');
 
     rows.forEach(row => {
@@ -900,10 +922,9 @@ function toggleVerificationFilter() {
     });
 }
 
-// Auto-refresh every 30 seconds
-setInterval(() => {
-    console.log('Auto-refresh check...');
-    // You can add auto-refresh logic here if needed
-}, 30000);
+// Auto-refresh every 30 seconds (optional)
+// setInterval(() => {
+//     console.log('Auto-refresh check...');
+// }, 30000);
 </script>
 @endpush
