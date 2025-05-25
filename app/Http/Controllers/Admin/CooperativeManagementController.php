@@ -17,27 +17,6 @@ class CooperativeManagementController extends Controller
         $this->middleware('auth');
     }
 
-    public function index()
-    {
-        /** @var User $user */
-        $user = Auth::user();
-
-        if (!$user->isSystemAdmin()) {
-            abort(403);
-        }
-
-        $pendingCooperatives = Cooperative::with('admin')
-            ->where('status', 'pending')
-            ->orderBy('created_at', 'desc')
-            ->paginate(10);
-
-        $approvedCooperatives = Cooperative::with('admin')
-            ->where('status', 'approved')
-            ->orderBy('updated_at', 'desc')
-            ->paginate(10);
-
-        return view('admin.cooperatives.index', compact('pendingCooperatives', 'approvedCooperatives'));
-    }
 
     public function show(Cooperative $cooperative)
     {
@@ -221,4 +200,202 @@ class CooperativeManagementController extends Controller
             $cooperative->admin->first_name
         );
     }
+
+    public function sendEmail(Request $request)
+{
+    /** @var User $user */
+    $user = Auth::user();
+
+    if (!$user->isSystemAdmin()) {
+        return response()->json(['success' => false, 'message' => 'Accès non autorisé'], 403);
+    }
+
+    $request->validate([
+        'to' => 'required|email',
+        'subject' => 'required|string|max:255',
+        'message' => 'required|string|max:2000'
+    ]);
+
+    try {
+        $emailSent = EmailService::sendNotificationEmail(
+            $request->to,
+            $request->subject,
+            "<p>" . nl2br(e($request->message)) . "</p><br><p>Cordialement,<br>L'équipe Coopérative E-commerce</p>",
+            ''
+        );
+
+        if ($emailSent) {
+            return response()->json(['success' => true, 'message' => 'Email envoyé avec succès']);
+        } else {
+            return response()->json(['success' => false, 'message' => 'Erreur lors de l\'envoi de l\'email']);
+        }
+    } catch (\Exception $e) {
+        return response()->json(['success' => false, 'message' => 'Erreur: ' . $e->getMessage()]);
+    }
+}
+
+public function index()
+{
+    /** @var User $user */
+    $user = Auth::user();
+
+    if (!$user->isSystemAdmin()) {
+        abort(403);
+    }
+
+    $pendingCooperatives = Cooperative::with('admin')
+        ->where('status', 'pending')
+        ->orderBy('created_at', 'desc')
+        ->paginate(10);
+
+    $approvedCooperatives = Cooperative::with('admin')
+        ->where('status', 'approved')
+        ->orderBy('updated_at', 'desc')
+        ->paginate(10);
+
+    $suspendedCooperatives = Cooperative::with(['admin', 'suspendedBy'])
+        ->where('status', 'suspended')
+        ->orderBy('suspended_at', 'desc')
+        ->paginate(10);
+
+    return view('admin.cooperatives.index', compact('pendingCooperatives', 'approvedCooperatives', 'suspendedCooperatives'));
+}
+
+public function suspend(Request $request, Cooperative $cooperative)
+{
+    /** @var User $user */
+    $user = Auth::user();
+
+    if (!$user->isSystemAdmin()) {
+        abort(403);
+    }
+
+    $request->validate([
+        'suspension_reason' => 'required|string|min:10|max:1000'
+    ]);
+
+    DB::beginTransaction();
+
+    try {
+        // Update cooperative status
+        $cooperative->update([
+            'status' => 'suspended',
+            'suspension_reason' => $request->suspension_reason,
+            'suspended_at' => now(),
+            'suspended_by' => $user->id,
+        ]);
+
+        // Update admin user status to suspended
+        if ($cooperative->admin) {
+            $cooperative->admin->update(['status' => 'suspended']);
+        }
+
+        // Send suspension email
+        $this->sendSuspensionEmail($cooperative, $request->suspension_reason);
+
+        DB::commit();
+
+        return redirect()->route('admin.cooperatives.show', $cooperative)
+                       ->with('success', "Coopérative '{$cooperative->name}' suspendue avec succès!");
+
+    } catch (\Exception $e) {
+        DB::rollback();
+        return back()->withErrors(['error' => 'Erreur lors de la suspension: ' . $e->getMessage()]);
+    }
+}
+
+public function unsuspend(Request $request, Cooperative $cooperative)
+{
+    /** @var User $user */
+    $user = Auth::user();
+
+    if (!$user->isSystemAdmin()) {
+        abort(403);
+    }
+
+    DB::beginTransaction();
+
+    try {
+        // Update cooperative status back to approved
+        $cooperative->update([
+            'status' => 'approved',
+            'suspension_reason' => null,
+            'suspended_at' => null,
+            'suspended_by' => null,
+        ]);
+
+        // Update admin user status back to active
+        if ($cooperative->admin) {
+            $cooperative->admin->update(['status' => 'active']);
+        }
+
+        // Send unsuspension email
+        $this->sendUnsuspensionEmail($cooperative);
+
+        DB::commit();
+
+        return redirect()->route('admin.cooperatives.index')
+                       ->with('success', "Suspension levée pour '{$cooperative->name}' avec succès!");
+
+    } catch (\Exception $e) {
+        DB::rollback();
+        return back()->withErrors(['error' => 'Erreur lors de la levée de suspension: ' . $e->getMessage()]);
+    }
+}
+
+private function sendSuspensionEmail(Cooperative $cooperative, $reason)
+{
+    $subject = 'Suspension de votre compte coopérative';
+    $message = "
+        <h2>Suspension de compte</h2>
+        <p>Bonjour {$cooperative->admin->first_name},</p>
+        <p>Nous vous informons que votre coopérative <strong>{$cooperative->name}</strong> a été temporairement suspendue.</p>
+        <p><strong>Raison de la suspension:</strong></p>
+        <p style='background: #f8f9fa; padding: 15px; border-left: 4px solid #dc3545;'>{$reason}</p>
+        <p><strong>Conséquences de cette suspension:</strong></p>
+        <ul>
+            <li>Votre accès au tableau de bord est temporairement bloqué</li>
+            <li>Vos produits ne sont plus visibles sur la plateforme</li>
+            <li>Vous ne pouvez plus traiter de nouvelles commandes</li>
+        </ul>
+        <p>Pour contester cette décision ou demander des clarifications, vous pouvez nous contacter en répondant à cet email.</p>
+        <p>Une fois les problèmes résolus, votre compte pourra être réactivé.</p>
+        <br>
+        <p>Cordialement,<br>L'équipe Coopérative E-commerce</p>
+    ";
+
+    return EmailService::sendNotificationEmail(
+        $cooperative->email,
+        $subject,
+        $message,
+        $cooperative->admin->first_name
+    );
+}
+
+private function sendUnsuspensionEmail(Cooperative $cooperative)
+{
+    $subject = 'Réactivation de votre compte coopérative';
+    $message = "
+        <h2>Compte réactivé</h2>
+        <p>Bonjour {$cooperative->admin->first_name},</p>
+        <p>Nous avons le plaisir de vous informer que la suspension de votre coopérative <strong>{$cooperative->name}</strong> a été levée.</p>
+        <p><strong>Votre accès est maintenant rétabli:</strong></p>
+        <ul>
+            <li>Vous pouvez vous connecter à votre tableau de bord</li>
+            <li>Vos produits sont de nouveau visibles sur la plateforme</li>
+            <li>Vous pouvez traiter les commandes normalement</li>
+        </ul>
+        <p>Nous vous remercions de votre compréhension et vous souhaitons une excellente continuation sur notre plateforme.</p>
+        <p><a href='" . route('login') . "' style='background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;'>Se connecter maintenant</a></p>
+        <br>
+        <p>Cordialement,<br>L'équipe Coopérative E-commerce</p>
+    ";
+
+    return EmailService::sendNotificationEmail(
+        $cooperative->email,
+        $subject,
+        $message,
+        $cooperative->admin->first_name
+    );
+}
 }

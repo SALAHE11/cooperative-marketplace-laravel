@@ -85,21 +85,17 @@
         </div>
 
         <div class="col-xl-3 col-md-6 mb-3">
-            <div class="card border-left-info shadow h-100 py-2">
+            <div class="card border-left-danger shadow h-100 py-2">
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
-                                Emails Vérifiés
+                            <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                                Suspendues
                             </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">
-                                {{ $pendingCooperatives->filter(function($coop) {
-                                    return $coop->email_verified_at && $coop->admin && $coop->admin->email_verified_at;
-                                })->count() }}
-                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $suspendedCooperatives->total() }}</div>
                         </div>
                         <div class="col-auto">
-                            <i class="fas fa-envelope-check fa-2x text-gray-300"></i>
+                            <i class="fas fa-ban fa-2x text-gray-300"></i>
                         </div>
                     </div>
                 </div>
@@ -143,6 +139,13 @@
                 <i class="fas fa-check me-2"></i>
                 Approuvées
                 <span class="badge bg-success ms-2">{{ $approvedCooperatives->total() }}</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="suspended-tab" data-bs-toggle="tab" data-bs-target="#suspended" type="button" role="tab">
+                <i class="fas fa-ban me-2"></i>
+                Suspendues
+                <span class="badge bg-danger ms-2">{{ $suspendedCooperatives->total() }}</span>
             </button>
         </li>
     </ul>
@@ -478,6 +481,106 @@
                 </div>
             </div>
         </div>
+
+        <!-- Suspended Cooperatives Tab -->
+        <div class="tab-pane fade" id="suspended" role="tabpanel">
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-ban me-2 text-danger"></i>
+                        Coopératives Suspendues
+                    </h5>
+                </div>
+                <div class="card-body">
+                    @if($suspendedCooperatives->count() > 0)
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-danger">
+                                    <tr>
+                                        <th>Coopérative</th>
+                                        <th>Secteur</th>
+                                        <th>Administrateur</th>
+                                        <th>Date Suspension</th>
+                                        <th>Raison</th>
+                                        <th>Suspendue par</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($suspendedCooperatives as $cooperative)
+                                    <tr>
+                                        <td>
+                                            <div>
+                                                <strong class="text-danger">{{ $cooperative->name }}</strong>
+                                                <br>
+                                                <small class="text-muted">{{ $cooperative->legal_status }}</small>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-danger">{{ $cooperative->sector_of_activity }}</span>
+                                        </td>
+                                        <td>
+                                            @if($cooperative->admin)
+                                                <div>
+                                                    {{ $cooperative->admin->full_name }}
+                                                    <br>
+                                                    <small class="text-muted">{{ $cooperative->admin->email }}</small>
+                                                    <br>
+                                                    <span class="badge bg-danger">Suspendu</span>
+                                                </div>
+                                            @else
+                                                <span class="text-muted">N/A</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            {{ $cooperative->suspended_at->format('d/m/Y H:i') }}
+                                            <br>
+                                            <small class="text-muted">
+                                                {{ $cooperative->suspended_at->diffForHumans() }}
+                                            </small>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-outline-info btn-sm"
+                                                    onclick="showSuspensionReason('{{ addslashes($cooperative->suspension_reason) }}', '{{ $cooperative->suspended_at->format('d/m/Y H:i') }}')"
+                                                    title="Voir la raison">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        </td>
+                                        <td>
+                                            {{ $cooperative->suspendedBy->full_name ?? 'Administrateur' }}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group-vertical" role="group">
+                                                <a href="{{ route('admin.cooperatives.show', $cooperative) }}"
+                                                   class="btn btn-info btn-sm mb-1" title="Voir détails">
+                                                    <i class="fas fa-eye me-1"></i>Détails
+                                                </a>
+                                                <button type="button" class="btn btn-success btn-sm"
+                                                        onclick="unsuspendCooperativeFromList({{ $cooperative->id }}, '{{ $cooperative->name }}')"
+                                                        title="Lever la suspension">
+                                                    <i class="fas fa-unlock me-1"></i>Réactiver
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="d-flex justify-content-center mt-3">
+                            {{ $suspendedCooperatives->links() }}
+                        </div>
+                    @else
+                        <div class="text-center py-5">
+                            <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
+                            <h4>Aucune coopérative suspendue</h4>
+                            <p class="text-muted">Toutes les coopératives sont actuellement actives.</p>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -625,6 +728,67 @@
         </div>
     </div>
 </div>
+
+<!-- Suspension Reason Modal -->
+<div class="modal fade" id="suspensionReasonModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-ban me-2"></i>
+                    Raison de la Suspension
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <strong>Date de suspension:</strong>
+                    <span id="suspensionDate" class="text-muted"></span>
+                </div>
+                <div>
+                    <strong>Raison:</strong>
+                    <div id="suspensionReason" class="mt-2 p-3 bg-light border-start border-danger border-4"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Unsuspend from List Modal -->
+<div class="modal fade" id="unsuspendFromListModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-unlock me-2"></i>
+                    Lever la Suspension
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Êtes-vous sûr de vouloir lever la suspension de <strong id="unsuspendCoopName"></strong>?
+                </div>
+                <p>Cette action réactivera immédiatement la coopérative et enverra un email de notification.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <form id="unsuspendFromListForm" method="POST" style="display: inline;">
+                    @csrf
+                    @method('PATCH')
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-unlock me-1"></i>
+                        Lever la Suspension
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('styles')
@@ -633,6 +797,7 @@
 .border-left-success { border-left: 0.25rem solid #1cc88a !important; }
 .border-left-info { border-left: 0.25rem solid #36b9cc !important; }
 .border-left-warning { border-left: 0.25rem solid #f6c23e !important; }
+.border-left-danger { border-left: 0.25rem solid #dc3545 !important; }
 
 .verification-status .badge {
     font-size: 0.7rem;
@@ -702,6 +867,23 @@ function requestInfo(cooperativeId, cooperativeName) {
     modal.show();
 }
 
+function showSuspensionReason(reason, date) {
+    document.getElementById('suspensionDate').textContent = date;
+    document.getElementById('suspensionReason').textContent = reason;
+
+    const modal = new bootstrap.Modal(document.getElementById('suspensionReasonModal'));
+    modal.show();
+}
+
+function unsuspendCooperativeFromList(cooperativeId, cooperativeName) {
+    document.getElementById('unsuspendCoopName').textContent = cooperativeName;
+    const form = document.getElementById('unsuspendFromListForm');
+    form.action = `/admin/cooperatives/${cooperativeId}/unsuspend`;
+
+    const modal = new bootstrap.Modal(document.getElementById('unsuspendFromListModal'));
+    modal.show();
+}
+
 function refreshPage() {
     window.location.reload();
 }
@@ -711,7 +893,7 @@ function toggleVerificationFilter() {
     const rows = table.querySelectorAll('tbody tr');
 
     rows.forEach(row => {
-        const hasSuccess = row.querySelector('.table-success');
+        const hasSuccess = row.classList.contains('table-success');
         if (hasSuccess) {
             row.style.display = row.style.display === 'none' ? '' : 'none';
         }

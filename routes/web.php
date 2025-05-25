@@ -55,5 +55,11 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
          ->name('cooperatives.reject');
     Route::post('/cooperatives/{cooperative}/request-info', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'requestInfo'])
          ->name('cooperatives.request-info');
+         Route::post('/send-email', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'sendEmail'])
+     ->name('send-email');
+     Route::patch('/cooperatives/{cooperative}/suspend', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'suspend'])
+         ->name('cooperatives.suspend');
+    Route::patch('/cooperatives/{cooperative}/unsuspend', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'unsuspend'])
+         ->name('cooperatives.unsuspend');
 });
 

@@ -23,11 +23,15 @@ class Cooperative extends Model
         'sector_of_activity',
         'status',
         'rejection_reason',
+        'suspended_at',
+        'suspension_reason',
+        'suspended_by',
     ];
 
     protected $casts = [
         'date_created' => 'date',
         'email_verified_at' => 'datetime',
+        'suspended_at' => 'datetime',
     ];
 
     public function users()
@@ -55,10 +59,21 @@ class Cooperative extends Model
         return $this->hasOne(User::class)->where('role', 'cooperative_admin');
     }
 
+    public function suspendedBy()
+    {
+        return $this->belongsTo(User::class, 'suspended_by');
+    }
+
     // Helper method to check if cooperative email is verified
     public function isEmailVerified()
     {
         return !is_null($this->email_verified_at);
+    }
+
+    // Helper method to check if cooperative is suspended
+    public function isSuspended()
+    {
+        return $this->status === 'suspended';
     }
 
     // Helper method to get logo URL
