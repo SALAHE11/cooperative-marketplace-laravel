@@ -7,7 +7,6 @@ use App\Http\Controllers\CoopRegistrationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Admin\CategoryManagementController;
 use App\Http\Controllers\Admin\CooperativeManagementController;
-use App\Http\Middleware\CheckRole;
 
 // Public routes
 Route::get('/', function () {
@@ -31,23 +30,23 @@ Route::post('/register/cooperative', [CoopRegistrationController::class, 'regist
 Route::get('/verify-coop-emails', [CoopRegistrationController::class, 'showVerifyEmailsForm'])->name('coop.verify-emails');
 Route::post('/verify-coop-emails', [CoopRegistrationController::class, 'verifyEmails']);
 
-// Dashboard routes (protected with role middleware using direct class reference)
+// Dashboard routes (protected with role middleware)
 Route::middleware(['auth'])->group(function () {
     Route::get('/admin/dashboard', [DashboardController::class, 'adminDashboard'])
-         ->middleware(CheckRole::class . ':system_admin')
+         ->middleware('check.role:system_admin')
          ->name('admin.dashboard');
 
     Route::get('/coop/dashboard', [DashboardController::class, 'coopDashboard'])
-         ->middleware(CheckRole::class . ':cooperative_admin')
+         ->middleware('check.role:cooperative_admin')
          ->name('coop.dashboard');
 
     Route::get('/client/dashboard', [DashboardController::class, 'clientDashboard'])
-         ->middleware(CheckRole::class . ':client')
+         ->middleware('check.role:client')
          ->name('client.dashboard');
 });
 
-// Admin routes using direct middleware class reference
-Route::middleware(['auth', CheckRole::class . ':system_admin'])->prefix('admin')->name('admin.')->group(function () {
+// Admin routes
+Route::middleware(['auth', 'check.role:system_admin'])->prefix('admin')->name('admin.')->group(function () {
 
     // Cooperative management routes
     Route::get('/cooperatives', [CooperativeManagementController::class, 'index'])->name('cooperatives.index');
@@ -66,4 +65,10 @@ Route::middleware(['auth', CheckRole::class . ':system_admin'])->prefix('admin')
     Route::put('/categories/{category}', [CategoryManagementController::class, 'update'])->name('categories.update');
     Route::delete('/categories/{category}', [CategoryManagementController::class, 'destroy'])->name('categories.destroy');
     Route::get('/categories/ajax', [CategoryManagementController::class, 'getCategoriesAjax'])->name('categories.ajax');
+
+    // NEW: Category hierarchy routes
+    Route::get('/categories/tree', [CategoryManagementController::class, 'getTreeData'])->name('categories.tree');
+    Route::post('/categories/{category}/move', [CategoryManagementController::class, 'moveCategory'])->name('categories.move');
+    Route::post('/categories/reorder', [CategoryManagementController::class, 'reorderCategories'])->name('categories.reorder');
+    Route::get('/categories/breadcrumb/{category}', [CategoryManagementController::class, 'getBreadcrumb'])->name('categories.breadcrumb');
 });
