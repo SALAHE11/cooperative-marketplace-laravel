@@ -1,3 +1,7 @@
+# ==========================================
+# FILE: resources/views/admin/categories/index.blade.php
+# COMPLETE REWRITE - TREE VIEW REMOVED
+# ==========================================
 @extends('layouts.app')
 
 @section('title', 'Gestion des Catégories - Admin')
@@ -22,10 +26,6 @@
                         <i class="fas fa-arrow-left me-2"></i>
                         Retour au tableau de bord
                     </a>
-                    <button class="btn btn-secondary me-2" onclick="toggleView()">
-                        <i class="fas fa-exchange-alt me-2"></i>
-                        <span id="viewToggleText">Vue Arbre</span>
-                    </button>
                     <button class="btn btn-primary" onclick="openAddModal()">
                         <i class="fas fa-plus me-2"></i>
                         Ajouter une Catégorie
@@ -149,14 +149,14 @@
         </div>
     </div>
 
-    <!-- Categories Content -->
+    <!-- Categories Table -->
     <div class="card shadow">
         <div class="card-header py-3">
             <div class="row align-items-center">
                 <div class="col-md-6">
                     <h6 class="m-0 font-weight-bold text-primary">
                         <i class="fas fa-list me-2"></i>
-                        <span id="tableTitle">Hiérarchie des Catégories</span>
+                        Hiérarchie des Catégories
                     </h6>
                 </div>
                 <div class="col-md-6">
@@ -174,188 +174,152 @@
             </div>
         </div>
         <div class="card-body">
-            <!-- Table View -->
-            <div id="tableView">
-                @if($categories->count() > 0)
-                    <div class="table-responsive">
-                        <table class="table table-hover" id="categoriesTable">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th style="width: 35%">
-                                        <i class="fas fa-sitemap me-1"></i>
-                                        Hiérarchie des Catégories
-                                    </th>
-                                    <th style="width: 20%">
-                                        <i class="fas fa-align-left me-1"></i>
-                                        Description
-                                    </th>
-                                    <th style="width: 10%">
-                                        <i class="fas fa-box me-1"></i>
-                                        Produits
-                                    </th>
-                                    <th style="width: 10%">
-                                        <i class="fas fa-sitemap me-1"></i>
-                                        Enfants
-                                    </th>
-                                    <th style="width: 15%">
-                                        <i class="fas fa-calendar me-1"></i>
-                                        Date
-                                    </th>
-                                    <th style="width: 10%">
-                                        <i class="fas fa-cogs me-1"></i>
-                                        Actions
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($categories as $category)
-                                <tr data-category-id="{{ $category->id }}"
-                                    data-category-name="{{ strtolower($category->name) }}"
-                                    data-level="{{ $category->level }}"
-                                    class="category-level-{{ $category->level }}">
-                                    <td>
-                                        <div class="d-flex align-items-center hierarchy-cell">
-                                            <!-- Hierarchical Indentation -->
-                                            <div class="hierarchy-indent" style="width: {{ $category->level * 25 }}px;">
-                                                @if($category->level > 0)
-                                                    @for($i = 0; $i < $category->level; $i++)
-                                                        @if($i == $category->level - 1)
-                                                            <span class="hierarchy-connector">└─</span>
-                                                        @else
-                                                            <span class="hierarchy-line">│&nbsp;&nbsp;</span>
-                                                        @endif
-                                                    @endfor
-                                                @endif
-                                            </div>
-
-                                            <!-- Category Icon -->
-                                            <div class="category-icon me-2">
-                                                @if($category->level == 0)
-                                                    <i class="fas fa-folder-open text-primary fa-lg"></i>
-                                                @elseif($category->hasChildren())
-                                                    <i class="fas fa-folder text-warning"></i>
-                                                @else
-                                                    <i class="fas fa-tag text-info"></i>
-                                                @endif
-                                            </div>
-
-                                            <!-- Category Info -->
-                                            <div class="category-info">
-                                                <div class="category-name fw-bold text-{{ $category->level == 0 ? 'primary' : ($category->level == 1 ? 'dark' : 'muted') }}">
-                                                    {{ $category->name }}
-                                                </div>
-                                                @if($category->level > 0 && $category->parent)
-                                                    <small class="text-muted">
-                                                        <i class="fas fa-level-up-alt me-1"></i>
-                                                        {{ $category->parent->name }}
-                                                    </small>
-                                                @endif
-                                            </div>
+            @if($categories->count() > 0)
+                <div class="table-responsive">
+                    <table class="table table-hover" id="categoriesTable">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="width: 35%">
+                                    <i class="fas fa-sitemap me-1"></i>
+                                    Hiérarchie des Catégories
+                                </th>
+                                <th style="width: 20%">
+                                    <i class="fas fa-align-left me-1"></i>
+                                    Description
+                                </th>
+                                <th style="width: 10%">
+                                    <i class="fas fa-box me-1"></i>
+                                    Produits
+                                </th>
+                                <th style="width: 10%">
+                                    <i class="fas fa-sitemap me-1"></i>
+                                    Enfants
+                                </th>
+                                <th style="width: 15%">
+                                    <i class="fas fa-calendar me-1"></i>
+                                    Date
+                                </th>
+                                <th style="width: 10%">
+                                    <i class="fas fa-cogs me-1"></i>
+                                    Actions
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($categories as $category)
+                            <tr data-category-id="{{ $category->id }}"
+                                data-category-name="{{ strtolower($category->name) }}"
+                                data-level="{{ $category->level }}"
+                                class="category-level-{{ $category->level }}">
+                                <td>
+                                    <div class="d-flex align-items-center hierarchy-cell">
+                                        <!-- Hierarchical Indentation -->
+                                        <div class="hierarchy-indent" style="width: {{ $category->level * 25 }}px;">
+                                            @if($category->level > 0)
+                                                @for($i = 0; $i < $category->level; $i++)
+                                                    @if($i == $category->level - 1)
+                                                        <span class="hierarchy-connector">└─</span>
+                                                    @else
+                                                        <span class="hierarchy-line">│&nbsp;&nbsp;</span>
+                                                    @endif
+                                                @endfor
+                                            @endif
                                         </div>
-                                    </td>
-                                    <td>
-                                        <small class="text-muted">
-                                            {{ Str::limit($category->description ?: 'Aucune description', 40) }}
-                                        </small>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-{{ $category->products_count > 0 ? 'primary' : 'secondary' }}">
-                                            {{ $category->products_count }}
+
+                                        <!-- Category Icon -->
+                                        <div class="category-icon me-2">
+                                            @if($category->level == 0)
+                                                <i class="fas fa-folder-open text-primary fa-lg"></i>
+                                            @elseif($category->hasChildren())
+                                                <i class="fas fa-folder text-warning"></i>
+                                            @else
+                                                <i class="fas fa-tag text-info"></i>
+                                            @endif
+                                        </div>
+
+                                        <!-- Category Info -->
+                                        <div class="category-info">
+                                            <div class="category-name fw-bold text-{{ $category->level == 0 ? 'primary' : ($category->level == 1 ? 'dark' : 'muted') }}">
+                                                {{ $category->name }}
+                                            </div>
+                                            @if($category->level > 0 && $category->parent)
+                                                <small class="text-muted">
+                                                    <i class="fas fa-level-up-alt me-1"></i>
+                                                    {{ $category->parent->name }}
+                                                </small>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <small class="text-muted">
+                                        {{ Str::limit($category->description ?: 'Aucune description', 40) }}
+                                    </small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ $category->products_count > 0 ? 'primary' : 'secondary' }}">
+                                        {{ $category->products_count }}
+                                    </span>
+                                </td>
+                                <td>
+                                    @if($category->hasChildren())
+                                        <span class="badge bg-info">
+                                            <i class="fas fa-sitemap me-1"></i>
+                                            {{ $category->children_count }}
                                         </span>
-                                    </td>
-                                    <td>
-                                        @if($category->hasChildren())
-                                            <span class="badge bg-info">
-                                                <i class="fas fa-sitemap me-1"></i>
-                                                {{ $category->children_count }}
-                                            </span>
-                                        @else
-                                            <span class="badge bg-light text-dark">
-                                                <i class="fas fa-leaf me-1"></i>
-                                                0
-                                            </span>
-                                        @endif
-                                    </td>
-                                    <td>
-                                        <small>
-                                            <strong>{{ $category->created_at->format('d/m/Y') }}</strong><br>
-                                            <span class="text-muted">{{ $category->created_at->format('H:i') }}</span>
-                                        </small>
-                                    </td>
-                                    <td>
-                                        <div class="btn-group-vertical btn-group-sm" role="group">
-                                            <button type="button" class="btn btn-success btn-sm mb-1"
-                                                    onclick="addSubcategory({{ $category->id }}, '{{ addslashes($category->name) }}')"
-                                                    title="Ajouter sous-catégorie">
-                                                <i class="fas fa-plus me-1"></i>
-                                            </button>
-                                            <button type="button" class="btn btn-warning btn-sm mb-1"
-                                                    onclick="editCategory({{ $category->id }}, '{{ addslashes($category->name) }}', '{{ addslashes($category->description ?? '') }}', {{ $category->parent_id ?? 'null' }})"
-                                                    title="Modifier cette catégorie">
-                                                <i class="fas fa-edit me-1"></i>
-                                            </button>
-                                            <button type="button" class="btn btn-danger btn-sm"
-                                                    onclick="deleteCategory({{ $category->id }}, '{{ addslashes($category->name) }}', {{ $category->products_count }}, {{ $category->children_count }})"
-                                                    title="Supprimer cette catégorie">
-                                                <i class="fas fa-trash me-1"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Pagination -->
-                    <div class="d-flex justify-content-center mt-3">
-                        {{ $categories->links() }}
-                    </div>
-                @else
-                    <div class="text-center py-5">
-                        <i class="fas fa-sitemap fa-4x text-muted mb-3"></i>
-                        <h4>Aucune catégorie trouvée</h4>
-                        <p class="text-muted">Commencez par ajouter votre première catégorie de produits.</p>
-                        <button class="btn btn-primary" onclick="openAddModal()">
-                            <i class="fas fa-plus me-2"></i>
-                            Ajouter une Catégorie
-                        </button>
-                    </div>
-                @endif
-            </div>
-
-            <!-- Modern Tree View -->
-            <div id="treeView" class="d-none">
-                <div class="tree-view-container">
-                    <div class="tree-view-header mb-3">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0">
-                                <i class="fas fa-sitemap me-2"></i>
-                                Vue Arbre Interactive
-                            </h5>
-                            <div>
-                                <button class="btn btn-outline-primary btn-sm me-2" onclick="expandAllNodes()">
-                                    <i class="fas fa-expand-arrows-alt me-1"></i>
-                                    Tout Déplier
-                                </button>
-                                <button class="btn btn-outline-secondary btn-sm" onclick="collapseAllNodes()">
-                                    <i class="fas fa-compress-arrows-alt me-1"></i>
-                                    Tout Replier
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="treeContainer" class="tree-container">
-                        <!-- Tree will be loaded here via AJAX -->
-                        <div class="tree-loading text-center py-4">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Chargement...</span>
-                            </div>
-                            <p class="mt-2 text-muted">Chargement de l'arbre des catégories...</p>
-                        </div>
-                    </div>
+                                    @else
+                                        <span class="badge bg-light text-dark">
+                                            <i class="fas fa-leaf me-1"></i>
+                                            0
+                                        </span>
+                                    @endif
+                                </td>
+                                <td>
+                                    <small>
+                                        <strong>{{ $category->created_at->format('d/m/Y') }}</strong><br>
+                                        <span class="text-muted">{{ $category->created_at->format('H:i') }}</span>
+                                    </small>
+                                </td>
+                                <td>
+                                    <div class="btn-group-vertical btn-group-sm" role="group">
+                                        <button type="button" class="btn btn-success btn-sm mb-1"
+                                                onclick="addSubcategory({{ $category->id }}, '{{ addslashes($category->name) }}')"
+                                                title="Ajouter sous-catégorie">
+                                            <i class="fas fa-plus me-1"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-warning btn-sm mb-1"
+                                                onclick="editCategory({{ $category->id }}, '{{ addslashes($category->name) }}', '{{ addslashes($category->description ?? '') }}', {{ $category->parent_id ?? 'null' }})"
+                                                title="Modifier cette catégorie">
+                                            <i class="fas fa-edit me-1"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-danger btn-sm"
+                                                onclick="deleteCategory({{ $category->id }}, '{{ addslashes($category->name) }}', {{ $category->products_count }}, {{ $category->children_count }})"
+                                                title="Supprimer cette catégorie">
+                                            <i class="fas fa-trash me-1"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
-            </div>
+
+                <!-- Pagination -->
+                <div class="d-flex justify-content-center mt-3">
+                    {{ $categories->links() }}
+                </div>
+            @else
+                <div class="text-center py-5">
+                    <i class="fas fa-sitemap fa-4x text-muted mb-3"></i>
+                    <h4>Aucune catégorie trouvée</h4>
+                    <p class="text-muted">Commencez par ajouter votre première catégorie de produits.</p>
+                    <button class="btn btn-primary" onclick="openAddModal()">
+                        <i class="fas fa-plus me-2"></i>
+                        Ajouter une Catégorie
+                    </button>
+                </div>
+            @endif
 
             <!-- No Results Message (hidden by default) -->
             <div id="noResults" class="text-center py-4 d-none">
@@ -519,160 +483,7 @@
     background-color: rgba(0,0,0,.075);
 }
 
-/* Modern Tree View Styling */
-.tree-view-container {
-    background: #f8f9fa;
-    border-radius: 10px;
-    padding: 20px;
-}
-
-.tree-view-header {
-    background: white;
-    padding: 15px 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.tree-container {
-    max-height: 600px;
-    overflow-y: auto;
-    background: white;
-    border-radius: 8px;
-    padding: 20px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.tree-node {
-    margin: 8px 0;
-    padding: 12px 15px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    border: 1px solid transparent;
-    background: #ffffff;
-}
-
-.tree-node:hover {
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    border-color: #dee2e6;
-    transform: translateX(5px);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.tree-node.root-node {
-    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
-    border-left: 4px solid #2196f3;
-    font-weight: 600;
-}
-
-.tree-node.parent-node {
-    background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
-    border-left: 4px solid #ff9800;
-    font-weight: 500;
-}
-
-.tree-node.leaf-node {
-    background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
-    border-left: 4px solid #4caf50;
-}
-
-.tree-node-content {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.tree-node-info {
-    display: flex;
-    align-items: center;
-    flex: 1;
-}
-
-.tree-node-icon {
-    margin-right: 12px;
-    font-size: 1.2em;
-    width: 20px;
-    text-align: center;
-}
-
-.tree-node-details {
-    flex: 1;
-}
-
-.tree-node-name {
-    font-weight: 500;
-    color: #333;
-    margin-bottom: 2px;
-}
-
-.tree-node-meta {
-    font-size: 0.85em;
-    color: #666;
-}
-
-.tree-node-actions {
-    display: flex;
-    gap: 5px;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.tree-node:hover .tree-node-actions {
-    opacity: 1;
-}
-
-.tree-node-badges {
-    display: flex;
-    gap: 5px;
-    margin-left: 10px;
-}
-
-.tree-indent {
-    margin-left: 30px;
-    border-left: 2px dashed #dee2e6;
-    padding-left: 20px;
-    position: relative;
-}
-
-.tree-indent::before {
-    content: '';
-    position: absolute;
-    left: -1px;
-    top: -8px;
-    bottom: 50%;
-    border-left: 2px solid #dee2e6;
-}
-
-.tree-toggle {
-    background: none;
-    border: none;
-    color: #666;
-    font-size: 0.9em;
-    padding: 2px 8px;
-    border-radius: 4px;
-    transition: all 0.2s ease;
-    margin-right: 8px;
-}
-
-.tree-toggle:hover {
-    background: #e9ecef;
-    color: #333;
-}
-
-.tree-toggle.collapsed::before {
-    content: '▶';
-}
-
-.tree-toggle.expanded::before {
-    content: '▼';
-}
-
-.tree-loading {
-    background: white;
-    border-radius: 8px;
-    padding: 40px;
-}
-
+/* Search highlighting */
 .search-highlight {
     background-color: #fff3cd;
     font-weight: bold;
@@ -690,28 +501,6 @@
         padding: 4px 8px;
         font-size: 0.8em;
     }
-
-    .tree-node {
-        padding: 8px 10px;
-    }
-
-    .tree-indent {
-        margin-left: 20px;
-        padding-left: 15px;
-    }
-}
-
-/* Animation for view transitions */
-.fade-transition {
-    transition: opacity 0.3s ease-in-out;
-}
-
-.fade-out {
-    opacity: 0;
-}
-
-.fade-in {
-    opacity: 1;
 }
 </style>
 @endpush
@@ -720,10 +509,7 @@
 <script>
 let editingCategoryId = null;
 let categoryModal = null;
-let currentView = 'table';
 let parentCategoryId = null;
-let treeData = null;
-let expandedNodes = new Set();
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
@@ -763,212 +549,6 @@ function initializeCategoryManagement() {
     if (token) {
         axios.defaults.headers.common['X-CSRF-TOKEN'] = token.getAttribute('content');
     }
-}
-
-// Toggle between table and tree view
-function toggleView() {
-    const tableView = document.getElementById('tableView');
-    const treeView = document.getElementById('treeView');
-    const toggleText = document.getElementById('viewToggleText');
-    const tableTitle = document.getElementById('tableTitle');
-
-    if (currentView === 'table') {
-        // Fade out table view
-        tableView.classList.add('fade-out');
-
-        setTimeout(() => {
-            tableView.classList.add('d-none');
-            treeView.classList.remove('d-none');
-            toggleText.textContent = 'Vue Liste';
-            tableTitle.textContent = 'Vue Arbre Interactive';
-            currentView = 'tree';
-
-            // Fade in tree view
-            treeView.classList.add('fade-in');
-            loadTreeView();
-        }, 300);
-    } else {
-        // Fade out tree view
-        treeView.classList.add('fade-out');
-
-        setTimeout(() => {
-            treeView.classList.add('d-none');
-            tableView.classList.remove('d-none');
-            toggleText.textContent = 'Vue Arbre';
-            tableTitle.textContent = 'Hiérarchie des Catégories';
-            currentView = 'table';
-
-            // Fade in table view
-            tableView.classList.add('fade-in');
-        }, 300);
-    }
-}
-
-// Load tree view data
-async function loadTreeView() {
-    try {
-        const response = await fetch('/admin/categories/tree');
-        const data = await response.json();
-
-        if (data.success) {
-            treeData = data.tree;
-            renderModernTree(data.tree);
-        } else {
-            showAlert('Erreur lors du chargement de la vue arbre', 'error');
-        }
-    } catch (error) {
-        console.error('Error loading tree view:', error);
-        showAlert('Erreur de connexion au serveur', 'error');
-    }
-}
-
-// Render modern tree structure
-function renderModernTree(categories, container = null, level = 0) {
-    if (!container) {
-        container = document.getElementById('treeContainer');
-        container.innerHTML = '';
-    }
-
-    categories.forEach(category => {
-        const nodeDiv = document.createElement('div');
-        const nodeClass = level === 0 ? 'root-node' : (category.has_children ? 'parent-node' : 'leaf-node');
-        nodeDiv.className = `tree-node ${nodeClass}`;
-        nodeDiv.setAttribute('data-category-id', category.id);
-        nodeDiv.setAttribute('data-level', level);
-
-        const hasChildren = category.children && category.children.length > 0;
-        const isExpanded = expandedNodes.has(category.id);
-
-        nodeDiv.innerHTML = `
-            <div class="tree-node-content">
-                <div class="tree-node-info">
-                    ${hasChildren ? `<button class="tree-toggle ${isExpanded ? 'expanded' : 'collapsed'}" onclick="toggleNode(${category.id})"></button>` : '<span style="width: 24px; display: inline-block;"></span>'}
-
-                    <i class="tree-node-icon fas fa-${getNodeIcon(category, level)} ${getNodeColor(category, level)}"></i>
-
-                    <div class="tree-node-details">
-                        <div class="tree-node-name">${category.name}</div>
-                        <div class="tree-node-meta">
-                            ${category.description ? category.description.substring(0, 50) + '...' : 'Aucune description'}
-                        </div>
-                    </div>
-
-                    <div class="tree-node-badges">
-                        <span class="badge bg-primary">${category.products_count} produits</span>
-                        ${hasChildren ? `<span class="badge bg-info">${category.children.length} enfants</span>` : ''}
-                    </div>
-                </div>
-                <div class="tree-node-actions">
-                    <button class="btn btn-success btn-sm" onclick="addSubcategory(${category.id}, '${category.name.replace(/'/g, "\\'")}')" title="Ajouter sous-catégorie">
-                        <i class="fas fa-plus"></i>
-                    </button>
-                    <button class="btn btn-warning btn-sm" onclick="editCategoryFromTree(${category.id})" title="Modifier">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    <button class="btn btn-danger btn-sm" onclick="deleteCategoryFromTree(${category.id}, '${category.name.replace(/'/g, "\\'")}', ${category.products_count}, ${category.children_count || 0})" title="Supprimer">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </div>
-        `;
-
-        container.appendChild(nodeDiv);
-
-        // Add children container
-        if (hasChildren) {
-            const childContainer = document.createElement('div');
-            childContainer.className = 'tree-indent';
-            childContainer.id = `children-${category.id}`;
-            childContainer.style.display = isExpanded ? 'block' : 'none';
-
-            nodeDiv.appendChild(childContainer);
-            renderModernTree(category.children, childContainer, level + 1);
-        }
-    });
-}
-
-// Get node icon based on category type and level
-function getNodeIcon(category, level) {
-    if (level === 0) return 'folder-open';
-    if (category.has_children) return 'folder';
-    return 'tag';
-}
-
-// Get node color based on category type and level
-function getNodeColor(category, level) {
-    if (level === 0) return 'text-primary';
-    if (category.has_children) return 'text-warning';
-    return 'text-success';
-}
-
-// Toggle tree node expansion
-function toggleNode(categoryId) {
-    const childContainer = document.getElementById(`children-${categoryId}`);
-    const toggleBtn = document.querySelector(`[data-category-id="${categoryId}"] .tree-toggle`);
-
-    if (expandedNodes.has(categoryId)) {
-        // Collapse
-        expandedNodes.delete(categoryId);
-        childContainer.style.display = 'none';
-        toggleBtn.classList.remove('expanded');
-        toggleBtn.classList.add('collapsed');
-    } else {
-        // Expand
-        expandedNodes.add(categoryId);
-        childContainer.style.display = 'block';
-        toggleBtn.classList.remove('collapsed');
-        toggleBtn.classList.add('expanded');
-    }
-}
-
-// Expand all nodes
-function expandAllNodes() {
-    if (!treeData) return;
-
-    function expandRecursive(categories) {
-        categories.forEach(category => {
-            if (category.children && category.children.length > 0) {
-                expandedNodes.add(category.id);
-                expandRecursive(category.children);
-            }
-        });
-    }
-
-    expandRecursive(treeData);
-    renderModernTree(treeData);
-}
-
-// Collapse all nodes
-function collapseAllNodes() {
-    expandedNodes.clear();
-    if (treeData) {
-        renderModernTree(treeData);
-    }
-}
-
-// Edit category from tree view
-async function editCategoryFromTree(id) {
-    // Find category data in tree
-    function findCategory(categories, targetId) {
-        for (let category of categories) {
-            if (category.id === targetId) return category;
-            if (category.children) {
-                const found = findCategory(category.children, targetId);
-                if (found) return found;
-            }
-        }
-        return null;
-    }
-
-    const category = findCategory(treeData, id);
-    if (category) {
-        editCategory(id, category.name, category.description || '', null);
-    }
-}
-
-// Delete category from tree view
-async function deleteCategoryFromTree(id, name, productCount, childrenCount) {
-    deleteCategory(id, name, productCount, childrenCount);
 }
 
 // Open add category modal
@@ -1271,15 +851,6 @@ async function deleteCategory(id, name, productCount, childrenCount) {
 
 // Filter categories
 function filterCategories() {
-    if (currentView === 'tree') {
-        filterTreeCategories();
-    } else {
-        filterTableCategories();
-    }
-}
-
-// Filter table categories
-function filterTableCategories() {
     const searchTerm = document.getElementById('searchInput')?.value?.toLowerCase()?.trim() || '';
     const table = document.getElementById('categoriesTable');
     const noResults = document.getElementById('noResults');
@@ -1316,68 +887,16 @@ function filterTableCategories() {
     }
 }
 
-// Filter tree categories
-function filterTreeCategories() {
-    const searchTerm = document.getElementById('searchInput')?.value?.toLowerCase()?.trim() || '';
-    const treeNodes = document.querySelectorAll('.tree-node');
-    let visibleCount = 0;
-
-    treeNodes.forEach(node => {
-        const nodeName = node.querySelector('.tree-node-name')?.textContent?.toLowerCase() || '';
-        const nodeDesc = node.querySelector('.tree-node-meta')?.textContent?.toLowerCase() || '';
-
-        if (!searchTerm || nodeName.includes(searchTerm) || nodeDesc.includes(searchTerm)) {
-            node.style.display = '';
-            visibleCount++;
-
-            if (searchTerm) {
-                // Highlight matching text
-                const nameEl = node.querySelector('.tree-node-name');
-                const descEl = node.querySelector('.tree-node-meta');
-
-                if (nameEl && nodeName.includes(searchTerm)) {
-                    nameEl.innerHTML = nameEl.textContent.replace(new RegExp(`(${searchTerm})`, 'gi'), '<span class="search-highlight">$1</span>');
-                }
-                if (descEl && nodeDesc.includes(searchTerm)) {
-                    descEl.innerHTML = descEl.textContent.replace(new RegExp(`(${searchTerm})`, 'gi'), '<span class="search-highlight">$1</span>');
-                }
-            }
-        } else {
-            node.style.display = 'none';
-        }
-    });
-
-    // Show/hide no results
-    const noResults = document.getElementById('noResults');
-    const treeContainer = document.getElementById('treeContainer');
-
-    if (visibleCount === 0 && searchTerm && noResults && treeContainer) {
-        treeContainer.style.display = 'none';
-        noResults.classList.remove('d-none');
-    } else if (treeContainer && noResults) {
-        treeContainer.style.display = '';
-        noResults.classList.add('d-none');
-    }
-}
-
 // Clear search
 function clearSearch() {
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
         searchInput.value = '';
         filterCategories();
-
-        // Clear highlights in tree view
-        if (currentView === 'tree') {
-            const highlighted = document.querySelectorAll('.search-highlight');
-            highlighted.forEach(el => {
-                el.outerHTML = el.innerHTML;
-            });
-        }
     }
 }
 
-// Highlight search term in table
+// Highlight search term
 function highlightSearchTerm(row, searchTerm) {
     const nameCell = row.querySelector('.category-name');
     const descCell = row.querySelector('td:nth-child(2) small');
@@ -1392,7 +911,7 @@ function highlightSearchTerm(row, searchTerm) {
     });
 }
 
-// Remove highlight from table
+// Remove highlight
 function removeHighlight(row) {
     const nameCell = row.querySelector('.category-name');
     const descCell = row.querySelector('td:nth-child(2) small');
