@@ -5,6 +5,9 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClientRegistrationController;
 use App\Http\Controllers\CoopRegistrationController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Admin\CategoryManagementController;
+use App\Http\Controllers\Admin\CooperativeManagementController;
+use App\Http\Middleware\CheckRole;
 
 // Public routes
 Route::get('/', function () {
@@ -28,50 +31,39 @@ Route::post('/register/cooperative', [CoopRegistrationController::class, 'regist
 Route::get('/verify-coop-emails', [CoopRegistrationController::class, 'showVerifyEmailsForm'])->name('coop.verify-emails');
 Route::post('/verify-coop-emails', [CoopRegistrationController::class, 'verifyEmails']);
 
-// Dashboard routes (protected with role middleware)
+// Dashboard routes (protected with role middleware using direct class reference)
 Route::middleware(['auth'])->group(function () {
     Route::get('/admin/dashboard', [DashboardController::class, 'adminDashboard'])
-         ->middleware('role:system_admin')
+         ->middleware(CheckRole::class . ':system_admin')
          ->name('admin.dashboard');
 
     Route::get('/coop/dashboard', [DashboardController::class, 'coopDashboard'])
-         ->middleware('role:cooperative_admin')
+         ->middleware(CheckRole::class . ':cooperative_admin')
          ->name('coop.dashboard');
 
     Route::get('/client/dashboard', [DashboardController::class, 'clientDashboard'])
-         ->middleware('role:client')
+         ->middleware(CheckRole::class . ':client')
          ->name('client.dashboard');
 });
 
-// Admin routes for cooperative management
-Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
-    Route::get('/cooperatives', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'index'])
-         ->name('cooperatives.index');
-    Route::get('/cooperatives/search', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'search'])
-         ->name('cooperatives.search');
-    Route::get('/cooperatives/{cooperative}', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'show'])
-         ->name('cooperatives.show');
-    Route::patch('/cooperatives/{cooperative}/approve', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'approve'])
-         ->name('cooperatives.approve');
-    Route::patch('/cooperatives/{cooperative}/reject', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'reject'])
-         ->name('cooperatives.reject');
-    Route::post('/cooperatives/{cooperative}/request-info', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'requestInfo'])
-         ->name('cooperatives.request-info');
-    Route::post('/send-email', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'sendEmail'])
-         ->name('send-email');
-    Route::patch('/cooperatives/{cooperative}/suspend', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'suspend'])
-         ->name('cooperatives.suspend');
-    Route::patch('/cooperatives/{cooperative}/unsuspend', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'unsuspend'])
-         ->name('cooperatives.unsuspend');
-     Route::get('/categories', [App\Http\Controllers\Admin\CategoryManagementController::class, 'index'])
-         ->name('categories.index');
-    Route::post('/categories', [App\Http\Controllers\Admin\CategoryManagementController::class, 'store'])
-         ->name('categories.store');
-    Route::match(['put', 'post'], '/categories/{category}', [App\Http\Controllers\Admin\CategoryManagementController::class, 'update'])
-         ->name('categories.update');
-    Route::delete('/categories/{category}', [App\Http\Controllers\Admin\CategoryManagementController::class, 'destroy'])
-         ->name('categories.destroy');
-    Route::get('/categories/ajax', [App\Http\Controllers\Admin\CategoryManagementController::class, 'getCategoriesAjax'])
-         ->name('categories.ajax');
-});
+// Admin routes using direct middleware class reference
+Route::middleware(['auth', CheckRole::class . ':system_admin'])->prefix('admin')->name('admin.')->group(function () {
 
+    // Cooperative management routes
+    Route::get('/cooperatives', [CooperativeManagementController::class, 'index'])->name('cooperatives.index');
+    Route::get('/cooperatives/search', [CooperativeManagementController::class, 'search'])->name('cooperatives.search');
+    Route::get('/cooperatives/{cooperative}', [CooperativeManagementController::class, 'show'])->name('cooperatives.show');
+    Route::patch('/cooperatives/{cooperative}/approve', [CooperativeManagementController::class, 'approve'])->name('cooperatives.approve');
+    Route::patch('/cooperatives/{cooperative}/reject', [CooperativeManagementController::class, 'reject'])->name('cooperatives.reject');
+    Route::post('/cooperatives/{cooperative}/request-info', [CooperativeManagementController::class, 'requestInfo'])->name('cooperatives.request-info');
+    Route::post('/send-email', [CooperativeManagementController::class, 'sendEmail'])->name('send-email');
+    Route::patch('/cooperatives/{cooperative}/suspend', [CooperativeManagementController::class, 'suspend'])->name('cooperatives.suspend');
+    Route::patch('/cooperatives/{cooperative}/unsuspend', [CooperativeManagementController::class, 'unsuspend'])->name('cooperatives.unsuspend');
+
+    // Category management routes
+    Route::get('/categories', [CategoryManagementController::class, 'index'])->name('categories.index');
+    Route::post('/categories', [CategoryManagementController::class, 'store'])->name('categories.store');
+    Route::put('/categories/{category}', [CategoryManagementController::class, 'update'])->name('categories.update');
+    Route::delete('/categories/{category}', [CategoryManagementController::class, 'destroy'])->name('categories.destroy');
+    Route::get('/categories/ajax', [CategoryManagementController::class, 'getCategoriesAjax'])->name('categories.ajax');
+});

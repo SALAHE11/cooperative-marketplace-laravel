@@ -8,15 +8,21 @@ use Illuminate\Support\Facades\Auth;
 
 class CheckRole
 {
-    public function handle(Request $request, Closure $next, ...$roles)
+    public function handle(Request $request, Closure $next, $role)
     {
         if (!Auth::check()) {
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'error' => 'Non authentifié'], 401);
+            }
             return redirect()->route('login');
         }
 
         $user = Auth::user();
 
-        if (!in_array($user->role, $roles)) {
+        if ($user->role !== $role) {
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'error' => 'Accès non autorisé'], 403);
+            }
             abort(403, 'Accès non autorisé.');
         }
 

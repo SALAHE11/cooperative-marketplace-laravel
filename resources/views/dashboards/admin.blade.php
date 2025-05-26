@@ -29,7 +29,9 @@
                             <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
                                 Coopératives Actives
                             </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">15</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ \App\Models\Cooperative::where('status', 'approved')->count() }}
+                            </div>
                         </div>
                         <div class="col-auto">
                             <i class="fas fa-building fa-2x text-gray-300"></i>
@@ -47,7 +49,9 @@
                             <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
                                 Clients Actifs
                             </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">1,245</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ \App\Models\User::where('role', 'client')->whereNotNull('email_verified_at')->count() }}
+                            </div>
                         </div>
                         <div class="col-auto">
                             <i class="fas fa-users fa-2x text-gray-300"></i>
@@ -65,7 +69,9 @@
                             <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
                                 Demandes en Attente
                             </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">8</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ \App\Models\Cooperative::where('status', 'pending')->count() }}
+                            </div>
                         </div>
                         <div class="col-auto">
                             <i class="fas fa-clock fa-2x text-gray-300"></i>
@@ -81,12 +87,14 @@
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                Revenus Totaux
+                                Catégories Totales
                             </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">125,450 MAD</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ \App\Models\Category::count() }}
+                            </div>
                         </div>
                         <div class="col-auto">
-                            <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                            <i class="fas fa-tags fa-2x text-gray-300"></i>
                         </div>
                     </div>
                 </div>
@@ -97,134 +105,132 @@
     <!-- Content Row -->
     <div class="row">
         <!-- Pending Cooperatives -->
-       <!-- Replace the existing "Pending Cooperatives" section with this -->
-    <div class="col-lg-8 mb-4">
-    <div class="card shadow">
-        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-            <h6 class="m-0 font-weight-bold text-primary">Demandes d'Inscription en Attente</h6>
-            <a href="{{ route('admin.cooperatives.index') }}" class="btn btn-primary btn-sm">
-                <i class="fas fa-list me-1"></i>
-                Gérer toutes
-            </a>
-        </div>
-        <div class="card-body">
-            @php
-                $pendingCoops = \App\Models\Cooperative::with('admin')->where('status', 'pending')->latest()->take(5)->get();
-            @endphp
+        <div class="col-lg-8 mb-4">
+            <div class="card shadow">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">Demandes d'Inscription en Attente</h6>
+                    <a href="{{ route('admin.cooperatives.index') }}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-list me-1"></i>
+                        Gérer toutes
+                    </a>
+                </div>
+                <div class="card-body">
+                    @php
+                        $pendingCoops = \App\Models\Cooperative::with('admin')->where('status', 'pending')->latest()->take(5)->get();
+                    @endphp
 
-            @if($pendingCoops->count() > 0)
-                <div class="table-responsive">
-                    <table class="table table-bordered" width="100%" cellspacing="0">
-                        <thead>
-                            <tr>
-                                <th>Coopérative</th>
-                                <th>Secteur</th>
-                                <th>Administrateur</th>
-                                <th>Vérification</th>
-                                <th>Date Demande</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($pendingCoops as $coop)
-                            <tr>
-                                <td>{{ $coop->name }}</td>
-                                <td>{{ $coop->sector_of_activity }}</td>
-                                <td>{{ $coop->admin->full_name ?? 'N/A' }}</td>
-                                <td>
-                                    <div>
-                                        @if($coop->admin && $coop->admin->email_verified_at)
-                                            <span class="badge bg-success mb-1">
-                                                <i class="fas fa-user"></i> Utilisateur ✓
-                                            </span>
-                                        @else
-                                            <span class="badge bg-warning mb-1">
-                                                <i class="fas fa-user"></i> Utilisateur ?
-                                            </span>
-                                        @endif
-                                        <br>
-                                        @if($coop->email_verified_at)
-                                            <span class="badge bg-success">
-                                                <i class="fas fa-building"></i> Coopérative ✓
-                                            </span>
-                                        @else
-                                            <span class="badge bg-warning">
-                                                <i class="fas fa-building"></i> Coopérative ?
-                                            </span>
-                                        @endif
-                                    </div>
-                                </td>
-                                <td>{{ $coop->created_at->format('d/m/Y') }}</td>
-                                <td>
-                                    <a href="{{ route('admin.cooperatives.show', $coop) }}" class="btn btn-info btn-sm">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                </td>
-                            </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
+                    @if($pendingCoops->count() > 0)
+                        <div class="table-responsive">
+                            <table class="table table-bordered" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Coopérative</th>
+                                        <th>Secteur</th>
+                                        <th>Administrateur</th>
+                                        <th>Vérification</th>
+                                        <th>Date Demande</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($pendingCoops as $coop)
+                                    <tr>
+                                        <td>{{ $coop->name }}</td>
+                                        <td>{{ $coop->sector_of_activity }}</td>
+                                        <td>{{ $coop->admin->full_name ?? 'N/A' }}</td>
+                                        <td>
+                                            <div>
+                                                @if($coop->admin && $coop->admin->email_verified_at)
+                                                    <span class="badge bg-success mb-1">
+                                                        <i class="fas fa-user"></i> Utilisateur ✓
+                                                    </span>
+                                                @else
+                                                    <span class="badge bg-warning mb-1">
+                                                        <i class="fas fa-user"></i> Utilisateur ?
+                                                    </span>
+                                                @endif
+                                                <br>
+                                                @if($coop->email_verified_at)
+                                                    <span class="badge bg-success">
+                                                        <i class="fas fa-building"></i> Coopérative ✓
+                                                    </span>
+                                                @else
+                                                    <span class="badge bg-warning">
+                                                        <i class="fas fa-building"></i> Coopérative ?
+                                                    </span>
+                                                @endif
+                                            </div>
+                                        </td>
+                                        <td>{{ $coop->created_at->format('d/m/Y') }}</td>
+                                        <td>
+                                            <a href="{{ route('admin.cooperatives.show', $coop) }}" class="btn btn-info btn-sm">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @else
+                        <div class="text-center py-4">
+                            <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                            <h5>Aucune demande en attente</h5>
+                            <p class="text-muted">Toutes les demandes ont été traitées.</p>
+                        </div>
+                    @endif
                 </div>
-            @else
-                <div class="text-center py-4">
-                    <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
-                    <h5>Aucune demande en attente</h5>
-                    <p class="text-muted">Toutes les demandes ont été traitées.</p>
-                </div>
-            @endif
+            </div>
         </div>
-    </div>
-</div>
 
         <!-- Quick Actions -->
-       <!-- In your existing admin.blade.php, update the Quick Actions section -->
-<div class="col-lg-4 mb-4">
-    <div class="card shadow">
-        <div class="card-header py-3">
-            <h6 class="m-0 font-weight-bold text-primary">Actions Rapides</h6>
-        </div>
-        <div class="card-body">
-            <div class="list-group list-group-flush">
-                <a href="{{ route('admin.cooperatives.index') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                    <div>
-                        <i class="fas fa-building text-primary me-3"></i>
-                        Gérer Coopératives
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Actions Rapides</h6>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <a href="{{ route('admin.cooperatives.index') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="fas fa-building text-primary me-3"></i>
+                                Gérer Coopératives
+                            </div>
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                        <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="fas fa-users text-success me-3"></i>
+                                Gérer Utilisateurs
+                            </div>
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                        <a href="{{ route('admin.categories.index') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="fas fa-tags text-info me-3"></i>
+                                Gérer Catégories
+                            </div>
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                        <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="fas fa-chart-bar text-warning me-3"></i>
+                                Rapports & Statistiques
+                            </div>
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                        <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="fas fa-cog text-secondary me-3"></i>
+                                Paramètres Système
+                            </div>
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
                     </div>
-                    <i class="fas fa-chevron-right"></i>
-                </a>
-                <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                    <div>
-                        <i class="fas fa-users text-success me-3"></i>
-                        Gérer Utilisateurs
-                    </div>
-                    <i class="fas fa-chevron-right"></i>
-                </a>
-                <!-- NEW CATEGORY MANAGEMENT LINK -->
-                <a href="{{ route('admin.categories.index') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                    <div>
-                        <i class="fas fa-tags text-info me-3"></i>
-                        Gérer Catégories
-                    </div>
-                    <i class="fas fa-chevron-right"></i>
-                </a>
-                <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                    <div>
-                        <i class="fas fa-chart-bar text-warning me-3"></i>
-                        Rapports & Statistiques
-                    </div>
-                    <i class="fas fa-chevron-right"></i>
-                </a>
-                <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                    <div>
-                        <i class="fas fa-cog text-secondary me-3"></i>
-                        Paramètres Système
-                    </div>
-                    <i class="fas fa-chevron-right"></i>
-                </a>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
     <!-- Recent Activities -->
     <div class="row">
@@ -235,30 +241,34 @@
                 </div>
                 <div class="card-body">
                     <div class="timeline">
-                        <div class="timeline-item">
-                            <div class="timeline-marker bg-success"></div>
-                            <div class="timeline-content">
-                                <h6 class="timeline-title">Nouvelle coopérative approuvée</h6>
-                                <p class="timeline-text">Coopérative Huile d'Olive Meknès a été approuvée et activée.</p>
-                                <small class="text-muted">Il y a 2 heures</small>
-                            </div>
-                        </div>
+                        @php
+                            $recentCategories = \App\Models\Category::latest()->take(3)->get();
+                            $recentCoops = \App\Models\Cooperative::latest()->take(2)->get();
+                        @endphp
+
+                        @foreach($recentCategories as $category)
                         <div class="timeline-item">
                             <div class="timeline-marker bg-info"></div>
                             <div class="timeline-content">
-                                <h6 class="timeline-title">Nouveau client inscrit</h6>
-                                <p class="timeline-text">25 nouveaux clients se sont inscrits aujourd'hui.</p>
-                                <small class="text-muted">Il y a 4 heures</small>
+                                <h6 class="timeline-title">Nouvelle catégorie créée</h6>
+                                <p class="timeline-text">Catégorie "{{ $category->name }}" a été ajoutée au système.</p>
+                                <small class="text-muted">{{ $category->created_at->diffForHumans() }}</small>
                             </div>
                         </div>
+                        @endforeach
+
+                        @foreach($recentCoops as $coop)
                         <div class="timeline-item">
-                            <div class="timeline-marker bg-warning"></div>
+                            <div class="timeline-marker bg-{{ $coop->status === 'approved' ? 'success' : 'warning' }}"></div>
                             <div class="timeline-content">
-                                <h6 class="timeline-title">Demande d'assistance</h6>
-                                <p class="timeline-text">Coopérative Saffran Taliouine a signalé un problème technique.</p>
-                                <small class="text-muted">Il y a 6 heures</small>
+                                <h6 class="timeline-title">
+                                    {{ $coop->status === 'approved' ? 'Coopérative approuvée' : 'Nouvelle demande' }}
+                                </h6>
+                                <p class="timeline-text">{{ $coop->name }} - {{ $coop->sector_of_activity }}</p>
+                                <small class="text-muted">{{ $coop->created_at->diffForHumans() }}</small>
                             </div>
                         </div>
+                        @endforeach
                     </div>
                 </div>
             </div>

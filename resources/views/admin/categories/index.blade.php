@@ -241,7 +241,7 @@
 </div>
 
 <!-- Add/Edit Category Modal -->
-<div class="modal fade" id="categoryModal" tabindex="-1">
+<div class="modal fade" id="categoryModal" tabindex="-1" aria-labelledby="modalTitle" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
@@ -249,7 +249,7 @@
                     <i class="fas fa-plus me-2"></i>
                     Ajouter une Catégorie
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="categoryForm">
                 @csrf
@@ -259,7 +259,8 @@
                             <i class="fas fa-tag me-1"></i>
                             Nom de la Catégorie *
                         </label>
-                        <input type="text" class="form-control" id="categoryName" name="name" required>
+                        <input type="text" class="form-control" id="categoryName" name="name" required
+                               placeholder="Entrez le nom de la catégorie">
                         <div class="invalid-feedback" id="nameError"></div>
                     </div>
                     <div class="mb-3">
@@ -278,8 +279,8 @@
                         Annuler
                     </button>
                     <button type="submit" class="btn btn-primary" id="submitBtn">
-                        <span class="spinner-border spinner-border-sm me-2 d-none" role="status"></span>
-                        <i class="fas fa-save me-1"></i>
+                        <span class="spinner-border spinner-border-sm me-2 d-none" role="status" aria-hidden="true"></span>
+                        <i class="fas fa-save me-1" id="submitIcon"></i>
                         <span id="submitText">Ajouter</span>
                     </button>
                 </div>
@@ -313,6 +314,14 @@
     background-color: #fff3cd;
     font-weight: bold;
 }
+
+.modal-backdrop {
+    z-index: 1040;
+}
+
+.modal {
+    z-index: 1050;
+}
 </style>
 @endpush
 
@@ -321,23 +330,31 @@
 let editingCategoryId = null;
 let categoryModal = null;
 
-// Setup CSRF token and initialize modal
+// Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize modal instance once
-    categoryModal = new bootstrap.Modal(document.getElementById('categoryModal'), {
-        keyboard: false,
-        backdrop: 'static'
-    });
-
-    // Setup form submission handler
-    setupFormHandler();
+    initializeCategoryManagement();
 });
 
-// Setup form submission handler
-function setupFormHandler() {
+function initializeCategoryManagement() {
+    // Initialize Bootstrap modal
+    const modalElement = document.getElementById('categoryModal');
+    if (modalElement) {
+        categoryModal = new bootstrap.Modal(modalElement, {
+            keyboard: false,
+            backdrop: 'static'
+        });
+    }
+
+    // Setup form submission handler
     const form = document.getElementById('categoryForm');
     if (form) {
         form.addEventListener('submit', handleFormSubmit);
+    }
+
+    // Setup CSRF token for all AJAX requests
+    const token = document.querySelector('meta[name="csrf-token"]');
+    if (token) {
+        axios.defaults.headers.common['X-CSRF-TOKEN'] = token.getAttribute('content');
     }
 }
 
@@ -345,43 +362,95 @@ function setupFormHandler() {
 function openAddModal() {
     editingCategoryId = null;
     resetForm();
-    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-plus me-2"></i>Ajouter une Catégorie';
-    document.getElementById('submitText').textContent = 'Ajouter';
-    categoryModal.show();
+    updateModalTitle('add');
+    if (categoryModal) {
+        categoryModal.show();
+    }
 }
 
 // Edit category
 function editCategory(id, name, description) {
     editingCategoryId = id;
     resetForm();
-    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit me-2"></i>Modifier la Catégorie';
-    document.getElementById('submitText').textContent = 'Mettre à jour';
+    updateModalTitle('edit');
+
+    // Populate form fields
     document.getElementById('categoryName').value = name;
     document.getElementById('categoryDescription').value = description || '';
-    categoryModal.show();
+
+    if (categoryModal) {
+        categoryModal.show();
+    }
+}
+
+// Update modal title and button text
+function updateModalTitle(mode) {
+    const modalTitle = document.getElementById('modalTitle');
+    const submitText = document.getElementById('submitText');
+    const submitIcon = document.getElementById('submitIcon');
+
+    if (mode === 'add') {
+        modalTitle.innerHTML = '<i class="fas fa-plus me-2"></i>Ajouter une Catégorie';
+        submitText.textContent = 'Ajouter';
+        submitIcon.className = 'fas fa-save me-1';
+    } else {
+        modalTitle.innerHTML = '<i class="fas fa-edit me-2"></i>Modifier la Catégorie';
+        submitText.textContent = 'Mettre à jour';
+        submitIcon.className = 'fas fa-save me-1';
+    }
 }
 
 // Reset form to initial state
 function resetForm() {
     const form = document.getElementById('categoryForm');
-    form.reset();
+    if (form) {
+        form.reset();
+    }
     clearFormErrors();
     resetSubmitButton();
 }
 
-// Reset submit button to initial state
+// Clear form validation errors
+function clearFormErrors() {
+    const fields = ['categoryName', 'categoryDescription'];
+    const errors = ['nameError', 'descriptionError'];
+
+    fields.forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        if (field) {
+            field.classList.remove('is-invalid');
+        }
+    });
+
+    errors.forEach(errorId => {
+        const error = document.getElementById(errorId);
+        if (error) {
+            error.textContent = '';
+        }
+    });
+}
+
+// Reset submit button to normal state
 function resetSubmitButton() {
     const submitBtn = document.getElementById('submitBtn');
-    const spinner = submitBtn.querySelector('.spinner-border');
+    const spinner = submitBtn?.querySelector('.spinner-border');
     const submitText = document.getElementById('submitText');
+    const submitIcon = document.getElementById('submitIcon');
 
-    spinner.classList.add('d-none');
-    submitBtn.disabled = false;
+    if (submitBtn) {
+        submitBtn.disabled = false;
+    }
 
-    if (editingCategoryId) {
-        submitText.textContent = 'Mettre à jour';
-    } else {
-        submitText.textContent = 'Ajouter';
+    if (spinner) {
+        spinner.classList.add('d-none');
+    }
+
+    if (submitIcon) {
+        submitIcon.classList.remove('d-none');
+    }
+
+    if (submitText) {
+        submitText.textContent = editingCategoryId ? 'Mettre à jour' : 'Ajouter';
     }
 }
 
@@ -390,29 +459,31 @@ async function handleFormSubmit(e) {
     e.preventDefault();
 
     const submitBtn = document.getElementById('submitBtn');
-    const spinner = submitBtn.querySelector('.spinner-border');
+    const spinner = submitBtn?.querySelector('.spinner-border');
     const submitText = document.getElementById('submitText');
+    const submitIcon = document.getElementById('submitIcon');
 
     // Prevent double submission
-    if (submitBtn.disabled) {
+    if (submitBtn?.disabled) {
         return;
     }
 
     // Show loading state
-    spinner.classList.remove('d-none');
-    submitText.textContent = 'En cours...';
-    submitBtn.disabled = true;
+    if (submitBtn) submitBtn.disabled = true;
+    if (spinner) spinner.classList.remove('d-none');
+    if (submitIcon) submitIcon.classList.add('d-none');
+    if (submitText) submitText.textContent = 'En cours...';
+
     clearFormErrors();
 
     // Get form data
-    const name = document.getElementById('categoryName').value.trim();
-    const description = document.getElementById('categoryDescription').value.trim();
+    const name = document.getElementById('categoryName')?.value?.trim() || '';
+    const description = document.getElementById('categoryDescription')?.value?.trim() || '';
 
     // Prepare request data
     const requestData = {
         name: name,
-        description: description,
-        _token: document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        description: description || null
     };
 
     try {
@@ -421,18 +492,17 @@ async function handleFormSubmit(e) {
         if (editingCategoryId) {
             url = `/admin/categories/${editingCategoryId}`;
             method = 'PUT';
-            requestData._method = 'PUT';
         } else {
             url = '/admin/categories';
             method = 'POST';
         }
 
         const response = await fetch(url, {
-            method: 'POST', // Always use POST, Laravel will handle _method
+            method: method,
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
-                'X-CSRF-TOKEN': requestData._token
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
             },
             body: JSON.stringify(requestData)
         });
@@ -441,29 +511,50 @@ async function handleFormSubmit(e) {
 
         if (response.ok && data.success) {
             showAlert(data.message, 'success');
-            categoryModal.hide();
-            // Reload page to show updated data
-            setTimeout(() => window.location.reload(), 1000);
+            if (categoryModal) {
+                categoryModal.hide();
+            }
+            // Reload page after a short delay
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
         } else {
             if (response.status === 422 && data.errors) {
                 // Handle validation errors
-                Object.keys(data.errors).forEach(field => {
-                    if (field === 'name') {
-                        showFieldError('categoryName', 'nameError', data.errors[field][0]);
-                    } else if (field === 'description') {
-                        showFieldError('categoryDescription', 'descriptionError', data.errors[field][0]);
-                    }
-                });
+                handleValidationErrors(data.errors);
             } else {
                 showAlert(data.message || data.error || 'Erreur lors de la sauvegarde', 'error');
             }
         }
     } catch (error) {
-        console.error('Erreur:', error);
+        console.error('Request error:', error);
         showAlert('Erreur de connexion au serveur', 'error');
     } finally {
-        // Reset button state
         resetSubmitButton();
+    }
+}
+
+// Handle validation errors
+function handleValidationErrors(errors) {
+    Object.keys(errors).forEach(field => {
+        if (field === 'name') {
+            showFieldError('categoryName', 'nameError', errors[field][0]);
+        } else if (field === 'description') {
+            showFieldError('categoryDescription', 'descriptionError', errors[field][0]);
+        }
+    });
+}
+
+// Show field error
+function showFieldError(fieldId, errorId, message) {
+    const field = document.getElementById(fieldId);
+    const errorDiv = document.getElementById(errorId);
+
+    if (field) {
+        field.classList.add('is-invalid');
+    }
+    if (errorDiv) {
+        errorDiv.textContent = message;
     }
 }
 
@@ -482,7 +573,7 @@ async function deleteCategory(id, name, productCount) {
         const response = await fetch(`/admin/categories/${id}`, {
             method: 'DELETE',
             headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
                 'Accept': 'application/json'
             }
         });
@@ -491,34 +582,33 @@ async function deleteCategory(id, name, productCount) {
 
         if (data.success) {
             showAlert(data.message, 'success');
-            // Reload page to show updated data
-            setTimeout(() => window.location.reload(), 1000);
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
         } else {
-            showAlert(data.error, 'error');
+            showAlert(data.error || 'Erreur lors de la suppression', 'error');
         }
     } catch (error) {
-        console.error('Erreur:', error);
+        console.error('Delete error:', error);
         showAlert('Erreur de connexion au serveur', 'error');
     }
 }
 
 // Filter categories
 function filterCategories() {
-    const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
+    const searchTerm = document.getElementById('searchInput')?.value?.toLowerCase()?.trim() || '';
     const table = document.getElementById('categoriesTable');
     const noResults = document.getElementById('noResults');
-    const rows = table ? table.querySelectorAll('tbody tr') : [];
+    const rows = table?.querySelectorAll('tbody tr') || [];
     let visibleRows = 0;
 
     rows.forEach(row => {
-        const categoryName = row.getAttribute('data-category-name');
-        const description = row.querySelector('td:nth-child(2)').textContent.toLowerCase();
+        const categoryName = row.getAttribute('data-category-name') || '';
+        const description = row.querySelector('td:nth-child(2)')?.textContent?.toLowerCase() || '';
 
         if (!searchTerm || categoryName.includes(searchTerm) || description.includes(searchTerm)) {
             row.style.display = '';
             visibleRows++;
-
-            // Highlight search term
             if (searchTerm) {
                 highlightSearchTerm(row, searchTerm);
             } else {
@@ -544,8 +634,11 @@ function filterCategories() {
 
 // Clear search
 function clearSearch() {
-    document.getElementById('searchInput').value = '';
-    filterCategories();
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.value = '';
+        filterCategories();
+    }
 }
 
 // Highlight search term
@@ -553,19 +646,14 @@ function highlightSearchTerm(row, searchTerm) {
     const nameCell = row.querySelector('td:first-child strong');
     const descCell = row.querySelector('td:nth-child(2) span');
 
-    if (nameCell) {
-        const originalText = nameCell.getAttribute('data-original') || nameCell.textContent;
-        nameCell.setAttribute('data-original', originalText);
-        const regex = new RegExp(`(${escapeRegExp(searchTerm)})`, 'gi');
-        nameCell.innerHTML = originalText.replace(regex, '<span class="search-highlight">$1</span>');
-    }
-
-    if (descCell) {
-        const originalText = descCell.getAttribute('data-original') || descCell.textContent;
-        descCell.setAttribute('data-original', originalText);
-        const regex = new RegExp(`(${escapeRegExp(searchTerm)})`, 'gi');
-        descCell.innerHTML = originalText.replace(regex, '<span class="search-highlight">$1</span>');
-    }
+    [nameCell, descCell].forEach(cell => {
+        if (cell) {
+            const originalText = cell.getAttribute('data-original') || cell.textContent;
+            cell.setAttribute('data-original', originalText);
+            const regex = new RegExp(`(${escapeRegExp(searchTerm)})`, 'gi');
+            cell.innerHTML = originalText.replace(regex, '<span class="search-highlight">$1</span>');
+        }
+    });
 }
 
 // Remove highlight
@@ -573,18 +661,18 @@ function removeHighlight(row) {
     const nameCell = row.querySelector('td:first-child strong');
     const descCell = row.querySelector('td:nth-child(2) span');
 
-    if (nameCell && nameCell.getAttribute('data-original')) {
-        nameCell.innerHTML = nameCell.getAttribute('data-original');
-    }
-
-    if (descCell && descCell.getAttribute('data-original')) {
-        descCell.innerHTML = descCell.getAttribute('data-original');
-    }
+    [nameCell, descCell].forEach(cell => {
+        if (cell && cell.getAttribute('data-original')) {
+            cell.innerHTML = cell.getAttribute('data-original');
+        }
+    });
 }
 
 // Show alert
 function showAlert(message, type) {
     const alertContainer = document.getElementById('alertContainer');
+    if (!alertContainer) return;
+
     const alertClass = type === 'error' ? 'alert-danger' : 'alert-success';
     const icon = type === 'error' ? 'fas fa-exclamation-circle' : 'fas fa-check-circle';
 
@@ -592,7 +680,7 @@ function showAlert(message, type) {
         <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
             <i class="${icon} me-2"></i>
             ${escapeHtml(message)}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     `;
 
@@ -603,29 +691,6 @@ function showAlert(message, type) {
             alert.remove();
         }
     }, 5000);
-}
-
-// Show field error
-function showFieldError(fieldId, errorId, message) {
-    const field = document.getElementById(fieldId);
-    const errorDiv = document.getElementById(errorId);
-
-    field.classList.add('is-invalid');
-    errorDiv.textContent = message;
-}
-
-// Clear form errors
-function clearFormErrors() {
-    const fields = ['categoryName', 'categoryDescription'];
-    const errors = ['nameError', 'descriptionError'];
-
-    fields.forEach(fieldId => {
-        document.getElementById(fieldId).classList.remove('is-invalid');
-    });
-
-    errors.forEach(errorId => {
-        document.getElementById(errorId).textContent = '';
-    });
 }
 
 // Utility functions
