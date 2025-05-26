@@ -177,53 +177,54 @@
 </div>
 
         <!-- Quick Actions -->
-        <div class="col-lg-4 mb-4">
-            <div class="card shadow">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Actions Rapides</h6>
-                </div>
-                <div class="card-body">
-                    <div class="list-group list-group-flush">
-                        <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                            <div>
-                                <i class="fas fa-building text-primary me-3"></i>
-                                Gérer Coopératives
-                            </div>
-                            <i class="fas fa-chevron-right"></i>
-                        </a>
-                        <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                            <div>
-                                <i class="fas fa-users text-success me-3"></i>
-                                Gérer Utilisateurs
-                            </div>
-                            <i class="fas fa-chevron-right"></i>
-                        </a>
-                        <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                            <div>
-                                <i class="fas fa-tags text-info me-3"></i>
-                                Gérer Catégories
-                            </div>
-                            <i class="fas fa-chevron-right"></i>
-                        </a>
-                        <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                            <div>
-                                <i class="fas fa-chart-bar text-warning me-3"></i>
-                                Rapports & Statistiques
-                            </div>
-                            <i class="fas fa-chevron-right"></i>
-                        </a>
-                        <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                            <div>
-                                <i class="fas fa-cog text-secondary me-3"></i>
-                                Paramètres Système
-                            </div>
-                            <i class="fas fa-chevron-right"></i>
-                        </a>
+       <!-- In your existing admin.blade.php, update the Quick Actions section -->
+<div class="col-lg-4 mb-4">
+    <div class="card shadow">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Actions Rapides</h6>
+        </div>
+        <div class="card-body">
+            <div class="list-group list-group-flush">
+                <a href="{{ route('admin.cooperatives.index') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas fa-building text-primary me-3"></i>
+                        Gérer Coopératives
                     </div>
-                </div>
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas fa-users text-success me-3"></i>
+                        Gérer Utilisateurs
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                <!-- NEW CATEGORY MANAGEMENT LINK -->
+                <a href="{{ route('admin.categories.index') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas fa-tags text-info me-3"></i>
+                        Gérer Catégories
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas fa-chart-bar text-warning me-3"></i>
+                        Rapports & Statistiques
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas fa-cog text-secondary me-3"></i>
+                        Paramètres Système
+                    </div>
+                    <i class="fas fa-chevron-right"></i>
+                </a>
             </div>
         </div>
     </div>
+</div>
 
     <!-- Recent Activities -->
     <div class="row">

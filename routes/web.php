@@ -63,5 +63,15 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
          ->name('cooperatives.suspend');
     Route::patch('/cooperatives/{cooperative}/unsuspend', [App\Http\Controllers\Admin\CooperativeManagementController::class, 'unsuspend'])
          ->name('cooperatives.unsuspend');
+     Route::get('/categories', [App\Http\Controllers\Admin\CategoryManagementController::class, 'index'])
+         ->name('categories.index');
+    Route::post('/categories', [App\Http\Controllers\Admin\CategoryManagementController::class, 'store'])
+         ->name('categories.store');
+    Route::match(['put', 'post'], '/categories/{category}', [App\Http\Controllers\Admin\CategoryManagementController::class, 'update'])
+         ->name('categories.update');
+    Route::delete('/categories/{category}', [App\Http\Controllers\Admin\CategoryManagementController::class, 'destroy'])
+         ->name('categories.destroy');
+    Route::get('/categories/ajax', [App\Http\Controllers\Admin\CategoryManagementController::class, 'getCategoriesAjax'])
+         ->name('categories.ajax');
 });
 
