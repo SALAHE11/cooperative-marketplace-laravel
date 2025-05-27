@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\DB;
 
 class PasswordResetController extends Controller
 {
@@ -27,35 +28,47 @@ class PasswordResetController extends Controller
     /**
      * Send password reset code via email
      */
-    public function sendResetCode(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'email' => 'required|email|exists:users,email'
-        ], [
-            'email.required' => 'L\'adresse email est requise.',
-            'email.email' => 'Veuillez entrer une adresse email valide.',
-            'email.exists' => 'Aucun compte n\'est associé à cette adresse email.'
-        ]);
+   public function sendResetCode(Request $request)
+{
+    $validator = Validator::make($request->all(), [
+        'email' => 'required|email|exists:users,email'
+    ], [
+        'email.required' => 'L\'adresse email est requise.',
+        'email.email' => 'Veuillez entrer une adresse email valide.',
+        'email.exists' => 'Aucun compte n\'est associé à cette adresse email.'
+    ]);
 
-        if ($validator->fails()) {
-            return back()->withErrors($validator)->withInput();
+    if ($validator->fails()) {
+        return back()->withErrors($validator)->withInput();
+    }
+
+    try {
+        $user = User::where('email', $request->email)->first();
+
+        // Check if user is active
+        if ($user->status !== 'active') {
+            return back()->withErrors(['email' => 'Votre compte n\'est pas activé.']);
         }
 
+        // Generate 6-digit code
+        $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        Log::info('Starting password reset process', [
+            'email' => $request->email,
+            'user_id' => $user->id,
+            'generated_code' => $code
+        ]);
+
+        // Delete existing reset codes for this email
+        $deletedCount = PasswordReset::where('email', $request->email)->delete();
+
+        Log::info('Deleted existing password reset codes', [
+            'email' => $request->email,
+            'deleted_count' => $deletedCount
+        ]);
+
+        // Create new reset code with enhanced debugging
         try {
-            $user = User::where('email', $request->email)->first();
-
-            // Check if user is active
-            if ($user->status !== 'active') {
-                return back()->withErrors(['email' => 'Votre compte n\'est pas activé.']);
-            }
-
-            // Generate 6-digit code
-            $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-
-            // Delete existing reset codes for this email
-            PasswordReset::where('email', $request->email)->delete();
-
-            // Create new reset code
             $passwordReset = PasswordReset::create([
                 'email' => $request->email,
                 'code' => $code,
@@ -63,40 +76,82 @@ class PasswordResetController extends Controller
                 'is_used' => false,
             ]);
 
-            // Send reset code via email
-            $emailSent = EmailService::sendPasswordResetCode(
-                $request->email,
-                $code,
-                $user->first_name
-            );
+            Log::info('Password reset record created successfully', [
+                'email' => $request->email,
+                'reset_id' => $passwordReset->id,
+                'code' => $code,
+                'expires_at' => $passwordReset->expires_at->toDateTimeString()
+            ]);
 
-            if (!$emailSent) {
-                $passwordReset->delete();
-                return back()->withErrors(['email' => 'Erreur lors de l\'envoi de l\'email.']);
+            // Verify the record was actually created
+            $verifyRecord = PasswordReset::where('email', $request->email)
+                ->where('code', $code)
+                ->first();
+
+            if (!$verifyRecord) {
+                Log::error('Password reset record verification failed', [
+                    'email' => $request->email,
+                    'code' => $code
+                ]);
+                return back()->withErrors(['email' => 'Erreur lors de la création du code de réinitialisation.']);
             }
 
-            Log::info('Password reset code sent', [
+            Log::info('Password reset record verified', [
+                'verified_id' => $verifyRecord->id,
+                'email' => $verifyRecord->email,
+                'code' => $verifyRecord->code
+            ]);
+
+        } catch (\Exception $createException) {
+            Log::error('Failed to create password reset record', [
                 'email' => $request->email,
                 'code' => $code,
+                'error' => $createException->getMessage(),
+                'trace' => $createException->getTraceAsString()
+            ]);
+            return back()->withErrors(['email' => 'Erreur lors de la création du code: ' . $createException->getMessage()]);
+        }
+
+        // Send reset code via email
+        $emailSent = EmailService::sendPasswordResetCode(
+            $request->email,
+            $code,
+            $user->first_name
+        );
+
+        if (!$emailSent) {
+            // Delete the created record if email fails
+            $passwordReset->delete();
+            Log::error('Email sending failed, deleted reset record', [
+                'email' => $request->email,
                 'reset_id' => $passwordReset->id
             ]);
-
-            // Store email in session for next step
-            Session::put('password_reset_email', $request->email);
-
-            return redirect()->route('password.verify-code')
-                ->with('success', 'Un code de vérification a été envoyé à votre email.');
-
-        } catch (\Exception $e) {
-            Log::error('Password reset code error', [
-                'email' => $request->email,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            return back()->with('error', 'Erreur lors de l\'envoi du code: ' . $e->getMessage());
+            return back()->withErrors(['email' => 'Erreur lors de l\'envoi de l\'email.']);
         }
+
+        Log::info('Password reset code sent successfully', [
+            'email' => $request->email,
+            'code' => $code,
+            'reset_id' => $passwordReset->id,
+            'user_first_name' => $user->first_name
+        ]);
+
+        // Store email in session for next step
+        Session::put('password_reset_email', $request->email);
+
+        return redirect()->route('password.verify-code')
+            ->with('success', 'Un code de vérification a été envoyé à votre email.');
+
+    } catch (\Exception $e) {
+        Log::error('Password reset code error', [
+            'email' => $request->email,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        return back()->with('error', 'Erreur lors de l\'envoi du code: ' . $e->getMessage());
     }
+}
 
     /**
      * Show code verification form
@@ -187,64 +242,100 @@ class PasswordResetController extends Controller
      * Set new password
      */
     public function setNewPassword(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'email' => 'required|email|exists:users,email',
-            'password' => 'required|string|min:8|confirmed',
-        ], [
-            'email.required' => 'L\'adresse email est requise.',
-            'email.exists' => 'Aucun compte n\'est associé à cette adresse email.',
-            'password.required' => 'Le mot de passe est requis.',
-            'password.min' => 'Le mot de passe doit contenir au moins 8 caractères.',
-            'password.confirmed' => 'La confirmation du mot de passe ne correspond pas.'
+{
+    $validator = Validator::make($request->all(), [
+        'email' => 'required|email|exists:users,email',
+        'password' => 'required|string|min:8|confirmed',
+    ], [
+        'email.required' => 'L\'adresse email est requise.',
+        'email.exists' => 'Aucun compte n\'est associé à cette adresse email.',
+        'password.required' => 'Le mot de passe est requis.',
+        'password.min' => 'Le mot de passe doit contenir au moins 8 caractères.',
+        'password.confirmed' => 'La confirmation du mot de passe ne correspond pas.'
+    ]);
+
+    if ($validator->fails()) {
+        return back()->withErrors($validator)->withInput();
+    }
+
+    // Verify session
+    $sessionEmail = Session::get('password_reset_email');
+    $verified = Session::get('password_reset_verified');
+    $codeId = Session::get('password_reset_code_id');
+
+    if (!$sessionEmail || !$verified || $sessionEmail !== $request->email) {
+        return redirect()->route('password.request')
+            ->with('error', 'Session invalide. Veuillez recommencer.');
+    }
+
+    try {
+        // FIXED: Use direct database update instead of model update
+        $hashedPassword = Hash::make($request->password);
+
+        // Method 1: Direct database update (most reliable)
+        $affectedRows = DB::table('users')
+            ->where('email', $request->email)
+            ->update(['password' => $hashedPassword]);
+
+        // Log the update attempt
+        Log::info('Password update attempt', [
+            'email' => $request->email,
+            'affected_rows' => $affectedRows,
+            'hashed_password_sample' => substr($hashedPassword, 0, 20) . '...'
         ]);
 
-        if ($validator->fails()) {
-            return back()->withErrors($validator)->withInput();
+        if ($affectedRows === 0) {
+            Log::warning('Password update failed - no rows affected', [
+                'email' => $request->email
+            ]);
+            return back()->with('error', 'Erreur: Aucune ligne mise à jour. Veuillez réessayer.');
         }
 
-        // Verify session
-        $sessionEmail = Session::get('password_reset_email');
-        $verified = Session::get('password_reset_verified');
-        $codeId = Session::get('password_reset_code_id');
-
-        if (!$sessionEmail || !$verified || $sessionEmail !== $request->email) {
-            return redirect()->route('password.request')
-                ->with('error', 'Session invalide. Veuillez recommencer.');
+        // Alternative Method 2: Using Eloquent with explicit save
+        /*
+        $user = User::where('email', $request->email)->first();
+        if (!$user) {
+            return back()->with('error', 'Utilisateur introuvable.');
         }
 
-        try {
-            // Update user password
-            $user = User::where('email', $request->email)->first();
-            $user->update([
-                'password' => Hash::make($request->password)
-            ]);
+        $user->password = $hashedPassword;
+        $saveResult = $user->save();
 
-            // Clean up - delete all reset codes for this email
-            PasswordReset::where('email', $request->email)->delete();
+        Log::info('Password save result', [
+            'email' => $request->email,
+            'save_result' => $saveResult ? 'true' : 'false'
+        ]);
 
-            // Clear session
-            Session::forget(['password_reset_email', 'password_reset_verified', 'password_reset_code_id']);
-
-            Log::info('Password reset completed', [
-                'email' => $request->email,
-                'user_id' => $user->id,
-                'reset_code_id' => $codeId
-            ]);
-
-            return redirect()->route('login')
-                ->with('success', 'Mot de passe réinitialisé avec succès! Vous pouvez maintenant vous connecter.');
-
-        } catch (\Exception $e) {
-            Log::error('Password reset update error', [
-                'email' => $request->email,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            return back()->with('error', 'Erreur lors de la réinitialisation du mot de passe: ' . $e->getMessage());
+        if (!$saveResult) {
+            return back()->with('error', 'Erreur lors de la sauvegarde du mot de passe.');
         }
+        */
+
+        // Clean up - delete all reset codes for this email
+        PasswordReset::where('email', $request->email)->delete();
+
+        // Clear session
+        Session::forget(['password_reset_email', 'password_reset_verified', 'password_reset_code_id']);
+
+        Log::info('Password reset completed successfully', [
+            'email' => $request->email,
+            'reset_code_id' => $codeId,
+            'rows_updated' => $affectedRows
+        ]);
+
+        return redirect()->route('login')
+            ->with('success', 'Mot de passe réinitialisé avec succès! Vous pouvez maintenant vous connecter.');
+
+    } catch (\Exception $e) {
+        Log::error('Password reset update error', [
+            'email' => $request->email,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        return back()->with('error', 'Erreur lors de la réinitialisation du mot de passe: ' . $e->getMessage());
     }
+}
 
     /**
      * Resend verification code
