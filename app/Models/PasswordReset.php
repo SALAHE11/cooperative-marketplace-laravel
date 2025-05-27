@@ -11,25 +11,35 @@ class PasswordReset extends Model
 {
     use HasFactory;
 
-    // Specify the table name explicitly to avoid conflicts with Laravel's default
     protected $table = 'password_resets';
 
     protected $fillable = [
         'email',
-        'token',
+        'code',
         'expires_at',
+        'is_used',
     ];
 
     protected $casts = [
         'expires_at' => 'datetime',
+        'is_used' => 'boolean',
     ];
 
-    // Enable timestamps
     public $timestamps = true;
 
     public function isExpired()
     {
         return $this->expires_at->isPast();
+    }
+
+    public function isValid()
+    {
+        return !$this->is_used && !$this->isExpired();
+    }
+
+    public function markAsUsed()
+    {
+        $this->update(['is_used' => true]);
     }
 }
 

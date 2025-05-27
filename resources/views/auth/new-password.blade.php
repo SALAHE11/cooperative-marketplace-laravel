@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Réinitialiser le mot de passe - Coopérative E-commerce')
+@section('title', 'Nouveau mot de passe - Coopérative E-commerce')
 
 @section('content')
 <div class="container py-5">
@@ -12,7 +12,8 @@
                         <i class="fas fa-lock-open fa-3x text-success mb-3"></i>
                         <h2 class="h3 mb-3">Nouveau mot de passe</h2>
                         <p class="text-muted">
-                            Choisissez un nouveau mot de passe sécurisé
+                            Choisissez un nouveau mot de passe sécurisé pour<br>
+                            <strong>{{ $email }}</strong>
                         </p>
                     </div>
 
@@ -26,26 +27,9 @@
                         </div>
                     @endif
 
-                    <form method="POST" action="{{ route('password.update') }}" id="resetForm">
+                    <form method="POST" action="{{ route('password.new.submit') }}" id="newPasswordForm">
                         @csrf
-                        <input type="hidden" name="token" value="{{ $token }}">
-
-                        <div class="mb-3">
-                            <label for="email" class="form-label">
-                                <i class="fas fa-envelope me-1"></i>
-                                Adresse Email
-                            </label>
-                            <input type="email"
-                                   class="form-control @error('email') is-invalid @enderror"
-                                   id="email"
-                                   name="email"
-                                   value="{{ old('email') }}"
-                                   required
-                                   autofocus>
-                            @error('email')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
+                        <input type="hidden" name="email" value="{{ $email }}">
 
                         <div class="mb-3">
                             <label for="password" class="form-label">
@@ -89,19 +73,18 @@
                         </div>
 
                         <button type="submit" class="btn btn-success w-100 mb-3" id="updateBtn">
-                            <span class="loading spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span class="loading spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" style="display: none;"></span>
                             <span class="btn-text">
                                 <i class="fas fa-check me-1"></i>
-                                Réinitialiser le mot de passe
+                                Définir le nouveau mot de passe
                             </span>
                         </button>
                     </form>
 
-                    <div class="text-center">
-                        <a href="{{ route('login') }}" class="text-decoration-none">
-                            <i class="fas fa-arrow-left me-1"></i>
-                            Retour à la connexion
-                        </a>
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>Presque terminé!</strong>
+                        Votre nouveau mot de passe sera actif immédiatement après validation.
                     </div>
                 </div>
             </div>
@@ -132,7 +115,7 @@
         setupPasswordToggle('togglePasswordConfirm', 'password_confirmation');
 
         // Form submission with loading state
-        const form = document.getElementById('resetForm');
+        const form = document.getElementById('newPasswordForm');
         const submitBtn = document.getElementById('updateBtn');
 
         form.addEventListener('submit', function(e) {

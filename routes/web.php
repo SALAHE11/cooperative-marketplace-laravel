@@ -22,9 +22,12 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // Password Reset routes
 Route::get('/password/reset', [PasswordResetController::class, 'showForgotForm'])->name('password.request');
-Route::post('/password/email', [PasswordResetController::class, 'sendResetEmail'])->name('password.email');
-Route::get('/password/reset/{token}', [PasswordResetController::class, 'showResetForm'])->name('password.reset');
-Route::post('/password/reset', [PasswordResetController::class, 'resetPassword'])->name('password.update');
+Route::post('/password/send-code', [PasswordResetController::class, 'sendResetCode'])->name('password.send-code');
+Route::get('/password/verify-code', [PasswordResetController::class, 'showVerifyCodeForm'])->name('password.verify-code');
+Route::post('/password/verify-code', [PasswordResetController::class, 'verifyCode'])->name('password.verify-code.submit');
+Route::get('/password/new', [PasswordResetController::class, 'showNewPasswordForm'])->name('password.new');
+Route::post('/password/new', [PasswordResetController::class, 'setNewPassword'])->name('password.new.submit');
+Route::post('/password/resend-code', [PasswordResetController::class, 'resendCode'])->name('password.resend-code');
 
 // Client registration routes
 Route::get('/register/client', [ClientRegistrationController::class, 'showRegistrationForm'])->name('client.register');
@@ -96,3 +99,5 @@ Route::middleware(['auth', 'check.role:system_admin'])->prefix('admin')->name('a
     Route::post('/users/activate-all-pending', [App\Http\Controllers\Admin\UserManagementController::class, 'activateAllPending'])->name('users.activateAllPending');
     Route::post('/users/suspend-multiple', [App\Http\Controllers\Admin\UserManagementController::class, 'suspendMultiple'])->name('users.suspendMultiple');
 });
+
+

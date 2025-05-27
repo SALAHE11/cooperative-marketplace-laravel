@@ -12,7 +12,7 @@
                         <i class="fas fa-key fa-3x text-warning mb-3"></i>
                         <h2 class="h3 mb-3">Mot de passe oublié</h2>
                         <p class="text-muted">
-                            Entrez votre adresse email pour recevoir un lien de réinitialisation
+                            Entrez votre adresse email pour recevoir un code de vérification
                         </p>
                     </div>
 
@@ -34,7 +34,7 @@
                         </div>
                     @endif
 
-                    <form method="POST" action="{{ route('password.email') }}" id="forgotForm">
+                    <form method="POST" action="{{ route('password.send-code') }}" id="forgotForm">
                         @csrf
 
                         <div class="mb-4">
@@ -55,11 +55,11 @@
                             @enderror
                         </div>
 
-                        <button type="submit" class="btn btn-warning w-100 mb-3" id="resetBtn">
-                            <span class="loading spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <button type="submit" class="btn btn-warning w-100 mb-3" id="sendCodeBtn">
+                            <span class="loading spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" style="display: none;"></span>
                             <span class="btn-text">
                                 <i class="fas fa-paper-plane me-1"></i>
-                                Envoyer le lien de réinitialisation
+                                Envoyer le code de vérification
                             </span>
                         </button>
                     </form>
@@ -75,7 +75,7 @@
                     <div class="alert alert-info mt-4">
                         <i class="fas fa-info-circle me-2"></i>
                         <strong>Important:</strong>
-                        Le lien de réinitialisation expire dans 1 heure. Vérifiez aussi votre dossier spam.
+                        Le code de vérification expire dans 15 minutes. Vérifiez aussi votre dossier spam.
                     </div>
                 </div>
             </div>
@@ -87,9 +87,8 @@
 @push('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Form submission with loading state
         const form = document.getElementById('forgotForm');
-        const submitBtn = document.getElementById('resetBtn');
+        const submitBtn = document.getElementById('sendCodeBtn');
 
         form.addEventListener('submit', function() {
             showLoading(submitBtn);

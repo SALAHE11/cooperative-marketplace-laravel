@@ -8,33 +8,22 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     *
-     * @return void
-     */
     public function up()
     {
-        // Drop the table if it exists (Laravel might have created a default one)
         Schema::dropIfExists('password_resets');
-        Schema::dropIfExists('password_reset_tokens');
 
         Schema::create('password_resets', function (Blueprint $table) {
             $table->id();
             $table->string('email')->index();
-            $table->string('token')->unique();
+            $table->string('code', 6); // 6-digit code
             $table->timestamp('expires_at');
+            $table->boolean('is_used')->default(false);
             $table->timestamps();
 
-            $table->index(['email', 'token']);
+            $table->index(['email', 'code']);
         });
     }
 
-    /**
-     * Reverse the migrations.
-     *
-     * @return void
-     */
     public function down()
     {
         Schema::dropIfExists('password_resets');

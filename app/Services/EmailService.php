@@ -290,4 +290,74 @@ class EmailService
             return false;
         }
     }
+
+    public static function sendPasswordResetCode($email, $code, $firstName)
+{
+    $mail = new PHPMailer(true);
+
+    try {
+        // Server settings
+        $mail->isSMTP();
+        $mail->Host       = env('MAIL_HOST');
+        $mail->SMTPAuth   = true;
+        $mail->Username   = env('MAIL_USERNAME');
+        $mail->Password   = env('MAIL_PASSWORD');
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->Port       = env('MAIL_PORT');
+
+        // IMPORTANT: Set character encoding to UTF-8
+        $mail->CharSet = 'UTF-8';
+        $mail->Encoding = 'base64';
+
+        // Recipients
+        $mail->setFrom(env('MAIL_FROM_ADDRESS'), env('MAIL_FROM_NAME'));
+        $mail->addAddress($email, $firstName);
+
+        // Content
+        $mail->isHTML(true);
+        $mail->Subject = 'Code de réinitialisation - Coopérative E-commerce';
+        $mail->Body    = "
+            <html>
+            <head>
+                <meta charset='UTF-8'>
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(45deg, #2c5aa0, #3d6bb3); color: white; text-align: center; padding: 30px; border-radius: 10px 10px 0 0; }
+                    .content { padding: 30px; background: #f8f9fa; border-radius: 0 0 10px 10px; text-align: center; }
+                    .code { font-size: 32px; font-weight: bold; color: #dc3545; letter-spacing: 8px; margin: 20px 0; padding: 15px; background: white; border: 2px dashed #dc3545; border-radius: 8px; }
+                    .footer { text-align: center; padding: 20px; color: #6c757d; }
+                    .warning { background: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                </style>
+            </head>
+            <body>
+                <div class='container'>
+                    <div class='header'>
+                        <h1>Coopérative E-commerce</h1>
+                        <p>Code de réinitialisation</p>
+                    </div>
+                    <div class='content'>
+                        <h2>Code de vérification</h2>
+                        <p>Bonjour {$firstName},</p>
+                        <p>Voici votre code de vérification pour réinitialiser votre mot de passe:</p>
+                        <div class='code'>{$code}</div>
+                        <p>Saisissez ce code sur la page de vérification pour continuer.</p>
+                        <div class='warning'>
+                            <strong>⚠️ Important:</strong> Ce code expire dans 15 minutes. Si vous n'avez pas fait cette demande, ignorez cet email.
+                        </div>
+                    </div>
+                    <div class='footer'>
+                        <p>&copy; " . date('Y') . " Coopérative E-commerce. Tous droits réservés.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        ";
+
+        $mail->send();
+        return true;
+    } catch (Exception $e) {
+        return false;
+    }
+}
 }
