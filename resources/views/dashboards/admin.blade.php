@@ -198,13 +198,13 @@
                             </div>
                             <i class="fas fa-chevron-right"></i>
                         </a>
-                        <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        <a href="{{ route('admin.users.index') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                             <div>
-                                <i class="fas fa-users text-success me-3"></i>
+                            <i class="fas fa-users text-success me-3"></i>
                                 Gérer Utilisateurs
                             </div>
                             <i class="fas fa-chevron-right"></i>
-                        </a>
+                       </a>
                         <a href="{{ route('admin.categories.index') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                             <div>
                                 <i class="fas fa-tags text-info me-3"></i>

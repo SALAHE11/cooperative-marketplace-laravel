@@ -71,4 +71,11 @@ Route::middleware(['auth', 'check.role:system_admin'])->prefix('admin')->name('a
     Route::post('/categories/{category}/move', [CategoryManagementController::class, 'moveCategory'])->name('categories.move');
     Route::post('/categories/reorder', [CategoryManagementController::class, 'reorderCategories'])->name('categories.reorder');
     Route::get('/categories/breadcrumb/{category}', [CategoryManagementController::class, 'getBreadcrumb'])->name('categories.breadcrumb');
+
+    // User management routes
+    Route::get('/users', [App\Http\Controllers\Admin\UserManagementController::class, 'index'])->name('users.index');
+    Route::get('/users/{user}', [App\Http\Controllers\Admin\UserManagementController::class, 'show'])->name('users.show');
+    Route::patch('/users/{user}/status', [App\Http\Controllers\Admin\UserManagementController::class, 'updateStatus'])->name('users.updateStatus');
+    Route::post('/users/activate-all-pending', [App\Http\Controllers\Admin\UserManagementController::class, 'activateAllPending'])->name('users.activateAllPending');
+    Route::post('/users/suspend-multiple', [App\Http\Controllers\Admin\UserManagementController::class, 'suspendMultiple'])->name('users.suspendMultiple');
 });
