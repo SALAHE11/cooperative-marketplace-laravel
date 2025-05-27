@@ -1,5 +1,7 @@
 <?php
 
+// File: app/Models/PasswordReset.php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -8,6 +10,9 @@ use Illuminate\Database\Eloquent\Model;
 class PasswordReset extends Model
 {
     use HasFactory;
+
+    // Specify the table name explicitly to avoid conflicts with Laravel's default
+    protected $table = 'password_resets';
 
     protected $fillable = [
         'email',
@@ -19,6 +24,7 @@ class PasswordReset extends Model
         'expires_at' => 'datetime',
     ];
 
+    // Enable timestamps
     public $timestamps = true;
 
     public function isExpired()
@@ -26,3 +32,5 @@ class PasswordReset extends Model
         return $this->expires_at->isPast();
     }
 }
+
+?>
