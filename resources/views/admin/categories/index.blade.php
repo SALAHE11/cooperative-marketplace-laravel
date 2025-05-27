@@ -1,7 +1,4 @@
-# ==========================================
-# FILE: resources/views/admin/categories/index.blade.php
-# COMPLETE REWRITE - TREE VIEW REMOVED
-# ==========================================
+
 @extends('layouts.app')
 
 @section('title', 'Gestion des Catégories - Admin')
