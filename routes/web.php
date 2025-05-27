@@ -7,6 +7,8 @@ use App\Http\Controllers\CoopRegistrationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Admin\CategoryManagementController;
 use App\Http\Controllers\Admin\CooperativeManagementController;
+use App\Http\Controllers\Admin\AdminInvitationController;
+use App\Http\Controllers\Auth\PasswordResetController;
 
 // Public routes
 Route::get('/', function () {
@@ -17,6 +19,12 @@ Route::get('/', function () {
 Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+
+// Password Reset routes
+Route::get('/password/reset', [PasswordResetController::class, 'showForgotForm'])->name('password.request');
+Route::post('/password/email', [PasswordResetController::class, 'sendResetEmail'])->name('password.email');
+Route::get('/password/reset/{token}', [PasswordResetController::class, 'showResetForm'])->name('password.reset');
+Route::post('/password/reset', [PasswordResetController::class, 'resetPassword'])->name('password.update');
 
 // Client registration routes
 Route::get('/register/client', [ClientRegistrationController::class, 'showRegistrationForm'])->name('client.register');
@@ -29,6 +37,12 @@ Route::get('/register/cooperative', [CoopRegistrationController::class, 'showReg
 Route::post('/register/cooperative', [CoopRegistrationController::class, 'register']);
 Route::get('/verify-coop-emails', [CoopRegistrationController::class, 'showVerifyEmailsForm'])->name('coop.verify-emails');
 Route::post('/verify-coop-emails', [CoopRegistrationController::class, 'verifyEmails']);
+
+// Admin registration routes (public - accessed via invitation link)
+Route::get('/admin/register/{token}', [AdminInvitationController::class, 'showRegistrationForm'])->name('admin.register');
+Route::post('/admin/register/{token}', [AdminInvitationController::class, 'register'])->name('admin.register.submit');
+Route::get('/admin/verify-email', [AdminInvitationController::class, 'showVerifyEmailForm'])->name('admin.verify-email');
+Route::post('/admin/verify-email', [AdminInvitationController::class, 'verifyEmail'])->name('admin.verify-email.submit');
 
 // Dashboard routes (protected with role middleware)
 Route::middleware(['auth'])->group(function () {
@@ -47,6 +61,9 @@ Route::middleware(['auth'])->group(function () {
 
 // Admin routes
 Route::middleware(['auth', 'check.role:system_admin'])->prefix('admin')->name('admin.')->group(function () {
+
+    // Admin invitation routes
+    Route::post('/send-invitation', [AdminInvitationController::class, 'sendInvitation'])->name('send-invitation');
 
     // Cooperative management routes
     Route::get('/cooperatives', [CooperativeManagementController::class, 'index'])->name('cooperatives.index');

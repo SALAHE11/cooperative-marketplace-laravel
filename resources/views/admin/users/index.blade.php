@@ -11,15 +11,19 @@
                 <i class="fas fa-users me-2"></i>
                 Gestion des Utilisateurs
             </h1>
-            <p class="text-muted">Gérer les utilisateurs clients et administrateurs de coopératives</p>
+            <p class="text-muted">Gérer les utilisateurs clients, administrateurs de coopératives et administrateurs système</p>
         </div>
         <div class="d-flex gap-2">
             <a href="{{ route('admin.dashboard') }}" class="btn btn-outline-primary">
                 <i class="fas fa-arrow-left me-1"></i>
                 Retour au tableau de bord
             </a>
+            <button type="button" class="btn btn-success shadow-sm" data-bs-toggle="modal" data-bs-target="#addAdminModal">
+                <i class="fas fa-user-shield me-1"></i>
+                Ajouter Admin
+            </button>
             @if($stats['pending'] > 0)
-                <button type="button" class="btn btn-success shadow-sm" data-bs-toggle="modal" data-bs-target="#activateAllModal">
+                <button type="button" class="btn btn-warning shadow-sm" data-bs-toggle="modal" data-bs-target="#activateAllModal">
                     <i class="fas fa-check-circle me-1"></i>
                     Activer tous ({{ $stats['pending'] }})
                 </button>
@@ -141,6 +145,20 @@
                 </div>
             </div>
         </div>
+
+        <div class="col-xl-2 col-md-4 mb-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body d-flex align-items-center">
+                    <div class="stats-icon stats-dark me-3">
+                        <i class="fas fa-user-shield"></i>
+                    </div>
+                    <div>
+                        <div class="stats-title">Admin Sys</div>
+                        <div class="stats-value">{{ number_format($stats['system_admins']) }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Active Filters -->
@@ -216,57 +234,70 @@
                                             <i class="fas fa-user-tie me-1"></i>
                                             Admin Coop
                                         </span>
+                                    @elseif($user->role === 'system_admin')
+                                        <span class="badge bg-dark">
+                                            <i class="fas fa-user-shield me-1"></i>
+                                            Admin Système
+                                        </span>
                                     @endif
                                 </td>
 
                                 <td>
-                                    <div class="dropdown">
-                                        <button class="btn btn-sm dropdown-toggle
-                                            @if($user->status === 'active') btn-light-success
-                                            @elseif($user->status === 'pending') btn-light-warning
-                                            @else btn-light-danger @endif"
-                                            type="button" data-bs-toggle="dropdown">
-                                            @if($user->status === 'active')
-                                                <i class="fas fa-check-circle me-1"></i> Actif
-                                            @elseif($user->status === 'pending')
-                                                <i class="fas fa-clock me-1"></i> En attente
-                                            @else
-                                                <i class="fas fa-ban me-1"></i> Suspendu
-                                            @endif
-                                        </button>
-                                        <ul class="dropdown-menu shadow-sm border-0">
-                                            <li>
-                                                <form action="{{ route('admin.users.updateStatus', $user->id) }}" method="POST">
-                                                    @csrf
-                                                    @method('PATCH')
-                                                    <input type="hidden" name="status" value="active">
-                                                    <button type="submit" class="dropdown-item d-flex align-items-center">
-                                                        <i class="fas fa-check-circle me-2 text-success"></i> Activer
-                                                    </button>
-                                                </form>
-                                            </li>
-                                            <li>
-                                                <form action="{{ route('admin.users.updateStatus', $user->id) }}" method="POST">
-                                                    @csrf
-                                                    @method('PATCH')
-                                                    <input type="hidden" name="status" value="pending">
-                                                    <button type="submit" class="dropdown-item d-flex align-items-center">
-                                                        <i class="fas fa-clock me-2 text-warning"></i> En attente
-                                                    </button>
-                                                </form>
-                                            </li>
-                                            <li>
-                                                <form action="{{ route('admin.users.updateStatus', $user->id) }}" method="POST">
-                                                    @csrf
-                                                    @method('PATCH')
-                                                    <input type="hidden" name="status" value="suspended">
-                                                    <button type="submit" class="dropdown-item d-flex align-items-center">
-                                                        <i class="fas fa-ban me-2 text-danger"></i> Suspendre
-                                                    </button>
-                                                </form>
-                                            </li>
-                                        </ul>
-                                    </div>
+                                    @if($user->id === auth()->id())
+                                        <!-- Current admin cannot modify their own status -->
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check-circle me-1"></i>
+                                            Actif (Vous)
+                                        </span>
+                                    @else
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm dropdown-toggle
+                                                @if($user->status === 'active') btn-light-success
+                                                @elseif($user->status === 'pending') btn-light-warning
+                                                @else btn-light-danger @endif"
+                                                type="button" data-bs-toggle="dropdown">
+                                                @if($user->status === 'active')
+                                                    <i class="fas fa-check-circle me-1"></i> Actif
+                                                @elseif($user->status === 'pending')
+                                                    <i class="fas fa-clock me-1"></i> En attente
+                                                @else
+                                                    <i class="fas fa-ban me-1"></i> Suspendu
+                                                @endif
+                                            </button>
+                                            <ul class="dropdown-menu shadow-sm border-0">
+                                                <li>
+                                                    <form action="{{ route('admin.users.updateStatus', $user->id) }}" method="POST">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <input type="hidden" name="status" value="active">
+                                                        <button type="submit" class="dropdown-item d-flex align-items-center">
+                                                            <i class="fas fa-check-circle me-2 text-success"></i> Activer
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                                <li>
+                                                    <form action="{{ route('admin.users.updateStatus', $user->id) }}" method="POST">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <input type="hidden" name="status" value="pending">
+                                                        <button type="submit" class="dropdown-item d-flex align-items-center">
+                                                            <i class="fas fa-clock me-2 text-warning"></i> En attente
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                                <li>
+                                                    <form action="{{ route('admin.users.updateStatus', $user->id) }}" method="POST">
+                                                        @csrf
+                                                        @method('PATCH')
+                                                        <input type="hidden" name="status" value="suspended">
+                                                        <button type="submit" class="dropdown-item d-flex align-items-center">
+                                                            <i class="fas fa-ban me-2 text-danger"></i> Suspendre
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    @endif
                                 </td>
 
                                 <td>
@@ -323,6 +354,65 @@
     <!-- Pagination -->
     <div class="d-flex justify-content-center">
         {{ $users->appends(request()->query())->links() }}
+    </div>
+</div>
+
+<!-- Add Admin Modal -->
+<div class="modal fade" id="addAdminModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-user-shield me-2"></i>Ajouter un administrateur
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addAdminForm" action="{{ route('admin.send-invitation') }}" method="POST">
+                    @csrf
+                    <div class="text-center mb-4">
+                        <div class="mb-3">
+                            <i class="fas fa-envelope-open fa-3x text-success mb-3"></i>
+                        </div>
+                        <h5>Envoyer une invitation</h5>
+                        <p class="text-muted">
+                            Un email d'invitation sera envoyé avec un lien d'inscription.
+                        </p>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="admin_email" class="form-label">
+                            <i class="fas fa-envelope me-1"></i>
+                            Adresse Email *
+                        </label>
+                        <input type="email"
+                               id="admin_email"
+                               name="email"
+                               class="form-control form-control-lg"
+                               placeholder="admin@exemple.com"
+                               required>
+                        <div class="invalid-feedback"></div>
+                        <small class="form-text text-muted">
+                            L'email doit être unique et ne pas exister déjà dans le système.
+                        </small>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Note:</strong> L'invitation expire dans 7 jours. La personne invitée pourra choisir son mot de passe et modifier ses informations lors de l'inscription.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="submit" form="addAdminForm" class="btn btn-success" id="sendInvitationBtn">
+                    <span class="loading spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" style="display: none;"></span>
+                    <span class="btn-text">
+                        <i class="fas fa-paper-plane me-1"></i> Envoyer l'invitation
+                    </span>
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -402,6 +492,7 @@
                                 <option value="">Tous les rôles</option>
                                 <option value="client" {{ request('role') === 'client' ? 'selected' : '' }}>Client</option>
                                 <option value="cooperative_admin" {{ request('role') === 'cooperative_admin' ? 'selected' : '' }}>Admin Coopérative</option>
+                                <option value="system_admin" {{ request('role') === 'system_admin' ? 'selected' : '' }}>Admin Système</option>
                             </select>
                         </div>
                     </div>
@@ -461,6 +552,7 @@
     .stats-danger { background-color: #dc3545; color: white; }
     .stats-info { background-color: #0dcaf0; color: white; }
     .stats-secondary { background-color: #6c757d; color: white; }
+    .stats-dark { background-color: #212529; color: white; }
 
     .stats-title {
         font-size: 14px;
@@ -502,4 +594,106 @@
     .card { transition: transform 0.2s ease-in-out; }
     .card:hover { transform: translateY(-2px); }
 </style>
+@endpush
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Add Admin Form Handler
+    const addAdminForm = document.getElementById('addAdminForm');
+    const sendInvitationBtn = document.getElementById('sendInvitationBtn');
+    const adminEmailInput = document.getElementById('admin_email');
+
+    if (addAdminForm) {
+        addAdminForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            // Show loading state
+            showLoading(sendInvitationBtn);
+
+            // Clear previous errors
+            adminEmailInput.classList.remove('is-invalid');
+            const feedback = adminEmailInput.nextElementSibling;
+            feedback.textContent = '';
+
+            // Submit form via AJAX
+            fetch(addAdminForm.action, {
+                method: 'POST',
+                body: new FormData(addAdminForm),
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideLoading(sendInvitationBtn);
+
+                if (data.success) {
+                    // Show success message
+                    showAlert('success', data.message);
+
+                    // Close modal and reset form
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('addAdminModal'));
+                    modal.hide();
+                    addAdminForm.reset();
+                } else {
+                    // Show validation errors
+                    if (data.errors && data.errors.email) {
+                        adminEmailInput.classList.add('is-invalid');
+                        feedback.textContent = data.errors.email[0];
+                    } else {
+                        showAlert('danger', data.message || 'Erreur lors de l\'envoi de l\'invitation');
+                    }
+                }
+            })
+            .catch(error => {
+                hideLoading(sendInvitationBtn);
+                console.error('Error:', error);
+                showAlert('danger', 'Erreur lors de l\'envoi de l\'invitation');
+            });
+        });
+    }
+
+    function showLoading(button) {
+        const loading = button.querySelector('.loading');
+        const text = button.querySelector('.btn-text');
+        if (loading && text) {
+            loading.style.display = 'inline-block';
+            text.style.display = 'none';
+            button.disabled = true;
+        }
+    }
+
+    function hideLoading(button) {
+        const loading = button.querySelector('.loading');
+        const text = button.querySelector('.btn-text');
+        if (loading && text) {
+            loading.style.display = 'none';
+            text.style.display = 'inline';
+            button.disabled = false;
+        }
+    }
+
+    function showAlert(type, message) {
+        const alertContainer = document.getElementById('alertContainer');
+        const alert = document.createElement('div');
+        alert.className = `alert alert-${type} alert-dismissible fade show`;
+        alert.innerHTML = `
+            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'} me-2"></i>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+
+        alertContainer.appendChild(alert);
+
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (alert.parentNode) {
+                alert.remove();
+            }
+        }, 5000);
+    }
+});
+</script>
 @endpush

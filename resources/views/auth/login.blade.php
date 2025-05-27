@@ -88,6 +88,13 @@
                                 Se Connecter
                             </span>
                         </button>
+
+                        <div class="text-center mb-3">
+                            <a href="{{ route('password.request') }}" class="text-decoration-none">
+                                <i class="fas fa-key me-1"></i>
+                                Mot de passe oublié ?
+                            </a>
+                        </div>
                     </form>
 
                     <div class="text-center">
