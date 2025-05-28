@@ -241,7 +241,10 @@ class PasswordResetController extends Controller
     /**
      * Set new password
      */
-    public function setNewPassword(Request $request)
+    /**
+ * Set new password
+ */
+public function setNewPassword(Request $request)
 {
     $validator = Validator::make($request->all(), [
         'email' => 'required|email|exists:users,email',
@@ -311,8 +314,8 @@ class PasswordResetController extends Controller
         }
         */
 
-        // Clean up - delete all reset codes for this email
-        PasswordReset::where('email', $request->email)->delete();
+        // REMOVED: Delete all reset codes for this email
+        // PasswordReset::where('email', $request->email)->delete();
 
         // Clear session
         Session::forget(['password_reset_email', 'password_reset_verified', 'password_reset_code_id']);
