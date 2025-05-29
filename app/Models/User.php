@@ -84,4 +84,14 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->role === 'client';
     }
+
+    public function removedBy()
+{
+    return $this->belongsTo(User::class, 'removed_by');
+}
+
+public function cooperativeAdminRequests()
+{
+    return $this->hasMany(CooperativeAdminRequest::class);
+}
 }

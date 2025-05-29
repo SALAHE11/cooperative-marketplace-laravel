@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use App\Models\User;
@@ -72,6 +73,7 @@ class CooperativeRequestManagementController extends Controller
         $admins = User::where('cooperative_id', $user->cooperative_id)
             ->where('role', 'cooperative_admin')
             ->where('status', 'active')
+            ->whereNull('removed_from_coop_at')
             ->orderBy('created_at', 'asc')
             ->get();
 
@@ -86,6 +88,52 @@ class CooperativeRequestManagementController extends Controller
                     'joined_at' => $admin->created_at->format('d/m/Y'),
                     'last_login' => $admin->last_login_at ? $admin->last_login_at->format('d/m/Y H:i') : 'Jamais connecté',
                     'is_current_user' => $admin->id === Auth::id(),
+                ];
+            })
+        ]);
+    }
+
+    /**
+     * NEW: Get inactive cooperative admins
+     */
+    public function getInactiveAdmins()
+    {
+        /** @var User $user */
+        $user = Auth::user();
+
+        if (!$user->isCooperativeAdmin() || !$user->cooperative) {
+            return response()->json(['success' => false, 'message' => 'Accès non autorisé'], 403);
+        }
+
+        $inactiveAdmins = User::with(['removedBy'])
+            ->where('role', 'cooperative_admin')
+            ->where('status', 'suspended')
+            ->whereNotNull('removed_from_coop_at')
+            ->where(function($query) use ($user) {
+                // Include admins who were part of this cooperative
+                $query->where('cooperative_id', $user->cooperative_id)
+                      ->orWhereHas('cooperativeAdminRequests', function($subQuery) use ($user) {
+                          $subQuery->where('cooperative_id', $user->cooperative_id)
+                                   ->where('status', 'approved');
+                      });
+            })
+            ->orderBy('removed_from_coop_at', 'desc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'inactive_admins' => $inactiveAdmins->map(function($admin) {
+                return [
+                    'id' => $admin->id,
+                    'full_name' => $admin->getFullNameAttribute(),
+                    'email' => $admin->email,
+                    'phone' => $admin->phone,
+                    'joined_at' => $admin->created_at->format('d/m/Y'),
+                    'removed_at' => $admin->removed_from_coop_at ? $admin->removed_from_coop_at->format('d/m/Y à H:i') : null,
+                    'removed_at_human' => $admin->removed_from_coop_at ? $admin->removed_from_coop_at->diffForHumans() : null,
+                    'removed_by' => $admin->removedBy ? $admin->removedBy->getFullNameAttribute() : 'Système',
+                    'removal_reason' => $admin->removal_reason,
+                    'last_login' => $admin->last_login_at ? $admin->last_login_at->format('d/m/Y H:i') : 'Jamais connecté',
                 ];
             })
         ]);
@@ -136,6 +184,9 @@ class CooperativeRequestManagementController extends Controller
             $newAdmin->update([
                 'cooperative_id' => $currentUser->cooperative_id,
                 'status' => 'active',
+                'removed_from_coop_at' => null,
+                'removed_by' => null,
+                'removal_reason' => null,
             ]);
 
             // Send approval email
@@ -346,10 +397,22 @@ class CooperativeRequestManagementController extends Controller
     }
 
     /**
-     * Remove an admin from cooperative (deactivate)
+     * UPDATED: Remove an admin from cooperative (suspend with tracking)
      */
     public function removeAdmin(Request $request, $adminId)
     {
+        $validator = Validator::make($request->all(), [
+            'removal_reason' => 'nullable|string|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Données invalides',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
         /** @var User $currentUser */
         $currentUser = Auth::user();
 
@@ -369,6 +432,7 @@ class CooperativeRequestManagementController extends Controller
             ->where('cooperative_id', $currentUser->cooperative_id)
             ->where('role', 'cooperative_admin')
             ->where('status', 'active')
+            ->whereNull('removed_from_coop_at')
             ->first();
 
         if (!$adminToRemove) {
@@ -376,10 +440,13 @@ class CooperativeRequestManagementController extends Controller
         }
 
         try {
-            // Deactivate the admin
+            // Suspend the admin with tracking info
             $adminToRemove->update([
-                'status' => 'inactive',
-                'cooperative_id' => null,
+                'status' => 'suspended', // Fixed: Use 'suspended' instead of 'inactive'
+                'removed_from_coop_at' => now(),
+                'removed_by' => $currentUser->id,
+                'removal_reason' => $request->removal_reason,
+                // Keep cooperative_id for tracking purposes
             ]);
 
             // Send notification email
@@ -387,13 +454,15 @@ class CooperativeRequestManagementController extends Controller
                 $adminToRemove->email,
                 $adminToRemove->first_name,
                 $currentUser->cooperative->name,
-                $currentUser->getFullNameAttribute()
+                $currentUser->getFullNameAttribute(),
+                $request->removal_reason
             );
 
             Log::info('Admin removed from cooperative', [
                 'removed_admin_id' => $adminId,
                 'removed_by' => $currentUser->id,
-                'cooperative_id' => $currentUser->cooperative_id
+                'cooperative_id' => $currentUser->cooperative_id,
+                'removal_reason' => $request->removal_reason
             ]);
 
             return response()->json([
@@ -411,6 +480,147 @@ class CooperativeRequestManagementController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors du retrait: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * NEW: Reactivate an admin
+     */
+    public function reactivateAdmin(Request $request, $adminId)
+    {
+        $validator = Validator::make($request->all(), [
+            'reactivation_message' => 'nullable|string|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Données invalides',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        /** @var User $currentUser */
+        $currentUser = Auth::user();
+
+        if (!$currentUser->isCooperativeAdmin() || !$currentUser->cooperative) {
+            return response()->json(['success' => false, 'message' => 'Accès non autorisé'], 403);
+        }
+
+        $adminToReactivate = User::where('id', $adminId)
+            ->where('role', 'cooperative_admin')
+            ->where('status', 'suspended')
+            ->whereNotNull('removed_from_coop_at')
+            ->first();
+
+        if (!$adminToReactivate) {
+            return response()->json(['success' => false, 'message' => 'Administrateur introuvable'], 404);
+        }
+
+        try {
+            // Reactivate the admin
+            $adminToReactivate->update([
+                'status' => 'active',
+                'cooperative_id' => $currentUser->cooperative_id,
+                'removed_from_coop_at' => null,
+                'removed_by' => null,
+                'removal_reason' => null,
+            ]);
+
+            // Send reactivation email
+            EmailService::sendAdminReactivatedNotification(
+                $adminToReactivate->email,
+                $adminToReactivate->first_name,
+                $currentUser->cooperative->name,
+                $currentUser->getFullNameAttribute(),
+                $request->reactivation_message
+            );
+
+            Log::info('Admin reactivated', [
+                'reactivated_admin_id' => $adminId,
+                'reactivated_by' => $currentUser->id,
+                'cooperative_id' => $currentUser->cooperative_id
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Administrateur réactivé avec succès'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to reactivate admin', [
+                'admin_id' => $adminId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la réactivation: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * NEW: Permanently remove an admin
+     */
+    public function permanentlyRemoveAdmin(Request $request, $adminId)
+    {
+        /** @var User $currentUser */
+        $currentUser = Auth::user();
+
+        if (!$currentUser->isCooperativeAdmin() || !$currentUser->cooperative) {
+            return response()->json(['success' => false, 'message' => 'Accès non autorisé'], 403);
+        }
+
+        $adminToDelete = User::where('id', $adminId)
+            ->where('role', 'cooperative_admin')
+            ->where('status', 'suspended')
+            ->whereNotNull('removed_from_coop_at')
+            ->first();
+
+        if (!$adminToDelete) {
+            return response()->json(['success' => false, 'message' => 'Administrateur introuvable'], 404);
+        }
+
+        try {
+            // Keep user account but completely remove from cooperative system
+            $adminToDelete->update([
+                'role' => 'client', // Convert back to regular client
+                'cooperative_id' => null,
+                'removed_from_coop_at' => null,
+                'removed_by' => null,
+                'removal_reason' => null,
+                'status' => 'active', // Reactivate as regular client
+            ]);
+
+            // Delete related cooperative admin requests
+            CooperativeAdminRequest::where('user_id', $adminId)
+                ->where('cooperative_id', $currentUser->cooperative_id)
+                ->delete();
+
+            Log::info('Admin permanently removed', [
+                'removed_admin_id' => $adminId,
+                'removed_by' => $currentUser->id,
+                'cooperative_id' => $currentUser->cooperative_id
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Administrateur définitivement retiré de la coopérative'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to permanently remove admin', [
+                'admin_id' => $adminId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors du retrait définitif: ' . $e->getMessage()
             ], 500);
         }
     }

@@ -139,8 +139,7 @@ Route::middleware(['auth', 'check.role:system_admin'])->prefix('admin')->name('a
 // ===== COOPERATIVE ADMIN ROUTES =====
 
 Route::middleware(['auth', 'check.role:cooperative_admin'])->prefix('coop')->name('coop.')->group(function () {
-
-    // Admin request management routes
+    // Existing admin request management routes
     Route::get('/admin-requests/pending', [CooperativeRequestManagementController::class, 'getPendingRequests'])->name('admin-requests.pending');
     Route::get('/admin-requests/current-admins', [CooperativeRequestManagementController::class, 'getCurrentAdmins'])->name('admin-requests.current-admins');
     Route::post('/admin-requests/{request}/approve', [CooperativeRequestManagementController::class, 'approveRequest'])->name('admin-requests.approve');
@@ -148,9 +147,10 @@ Route::middleware(['auth', 'check.role:cooperative_admin'])->prefix('coop')->nam
     Route::post('/admin-requests/{request}/clarification', [CooperativeRequestManagementController::class, 'requestClarification'])->name('admin-requests.clarification');
     Route::delete('/admins/{admin}/remove', [CooperativeRequestManagementController::class, 'removeAdmin'])->name('admins.remove');
 
-    // Additional cooperative admin routes can be added here
-    // Example: Product management, order management, etc.
-
+    // NEW: Inactive admin management routes
+    Route::get('/admin-requests/inactive-admins', [CooperativeRequestManagementController::class, 'getInactiveAdmins'])->name('admin-requests.inactive-admins');
+    Route::post('/admins/{admin}/reactivate', [CooperativeRequestManagementController::class, 'reactivateAdmin'])->name('admins.reactivate');
+    Route::delete('/admins/{admin}/permanently-remove', [CooperativeRequestManagementController::class, 'permanentlyRemoveAdmin'])->name('admins.permanently-remove');
 });
 
 // ===== CLIENT ROUTES =====

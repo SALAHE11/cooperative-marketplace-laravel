@@ -625,7 +625,8 @@ public static function sendClarificationRequest($email, $firstName, $cooperative
     }
 }
 
-public static function sendAdminRemovedNotification($email, $firstName, $cooperativeName, $removedByName)
+
+public static function sendAdminRemovedNotification($email, $firstName, $cooperativeName, $removedByName, $reason = '')
 {
     $mail = new PHPMailer(true);
 
@@ -646,9 +647,16 @@ public static function sendAdminRemovedNotification($email, $firstName, $coopera
         $mail->setFrom(env('MAIL_FROM_ADDRESS'), env('MAIL_FROM_NAME'));
         $mail->addAddress($email, $firstName);
 
+        $reasonHtml = $reason ? "
+            <div class='reason-box'>
+                <h4>Motif du retrait:</h4>
+                <p>{$reason}</p>
+            </div>
+        " : '';
+
         // Content
         $mail->isHTML(true);
-        $mail->Subject = "Retrait d'administration - {$cooperativeName}";
+        $mail->Subject = "Retrait temporaire d'administration - {$cooperativeName}";
         $mail->Body    = "
             <html>
             <head>
@@ -656,34 +664,39 @@ public static function sendAdminRemovedNotification($email, $firstName, $coopera
                 <style>
                     body { font-family: Arial, sans-serif; line-height: 1.6; }
                     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                    .header { background: #6c757d; color: white; text-align: center; padding: 30px; border-radius: 10px 10px 0 0; }
+                    .header { background: #ffc107; color: #212529; text-align: center; padding: 30px; border-radius: 10px 10px 0 0; }
                     .content { padding: 30px; background: #f8f9fa; border-radius: 0 0 10px 10px; }
                     .footer { text-align: center; padding: 20px; color: #6c757d; }
                     .info-box { background: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                    .reason-box { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }
                 </style>
             </head>
             <body>
                 <div class='container'>
                     <div class='header'>
-                        <i class='fas fa-user-minus fa-3x mb-3'></i>
-                        <h1>Retrait d'Administration</h1>
+                        <i class='fas fa-pause-circle fa-3x mb-3'></i>
+                        <h1>Retrait Temporaire d'Administration</h1>
                         <p>{$cooperativeName}</p>
                     </div>
                     <div class='content'>
                         <h2>Bonjour {$firstName},</h2>
-                        <p>Nous vous informons que vos droits d'administration pour la coopérative <strong>{$cooperativeName}</strong> ont été retirés par <strong>{$removedByName}</strong>.</p>
+                        <p>Nous vous informons que vos droits d'administration pour la coopérative <strong>{$cooperativeName}</strong> ont été temporairement suspendus par <strong>{$removedByName}</strong>.</p>
+
+                        {$reasonHtml}
 
                         <div class='info-box'>
-                            <h4>Conséquences:</h4>
+                            <h4>Informations importantes:</h4>
                             <ul>
-                                <li>Vous n'avez plus accès au tableau de bord administrateur</li>
-                                <li>Vos privilèges de gestion ont été révoqués</li>
+                                <li><strong>Suspension temporaire:</strong> Cette action peut être annulée</li>
+                                <li><strong>Compte préservé:</strong> Vos informations sont conservées</li>
+                                <li><strong>Réactivation possible:</strong> Les administrateurs peuvent vous réintégrer</li>
+                                <li><strong>Accès révoqué:</strong> Vous ne pouvez plus accéder au tableau de bord</li>
                             </ul>
                         </div>
 
-                        <p>Si vous pensez qu'il s'agit d'une erreur ou si vous souhaitez des clarifications, nous vous encourageons à contacter directement la coopérative.</p>
+                        <p>Si vous souhaitez des clarifications ou contester cette décision, nous vous encourageons à contacter directement les responsables de la coopérative.</p>
 
-                        <p>Merci pour votre contribution passée à <strong>{$cooperativeName}</strong>.</p>
+                        <p><strong>Note:</strong> Cette suspension est temporaire et peut être levée à tout moment par un administrateur de la coopérative.</p>
                     </div>
                     <div class='footer'>
                         <p>&copy; " . date('Y') . " Coopérative E-commerce. Tous droits réservés.</p>
@@ -704,4 +717,101 @@ public static function sendAdminRemovedNotification($email, $firstName, $coopera
         return false;
     }
 }
+
+public static function sendAdminReactivatedNotification($email, $firstName, $cooperativeName, $reactivatedByName, $message = '')
+{
+    $mail = new PHPMailer(true);
+
+    try {
+        // Server settings
+        $mail->isSMTP();
+        $mail->Host       = env('MAIL_HOST');
+        $mail->SMTPAuth   = true;
+        $mail->Username   = env('MAIL_USERNAME');
+        $mail->Password   = env('MAIL_PASSWORD');
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->Port       = env('MAIL_PORT');
+
+        $mail->CharSet = 'UTF-8';
+        $mail->Encoding = 'base64';
+
+        // Recipients
+        $mail->setFrom(env('MAIL_FROM_ADDRESS'), env('MAIL_FROM_NAME'));
+        $mail->addAddress($email, $firstName);
+
+        $messageHtml = $message ? "
+            <div class='message-box'>
+                <h4>Message de l'administrateur:</h4>
+                <p>{$message}</p>
+            </div>
+        " : '';
+
+        // Content
+        $mail->isHTML(true);
+        $mail->Subject = "Réactivation d'administration - {$cooperativeName}";
+        $mail->Body    = "
+            <html>
+            <head>
+                <meta charset='UTF-8'>
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(45deg, #28a745, #20c997); color: white; text-align: center; padding: 30px; border-radius: 10px 10px 0 0; }
+                    .content { padding: 30px; background: #f8f9fa; border-radius: 0 0 10px 10px; }
+                    .button { display: inline-block; padding: 15px 30px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; }
+                    .footer { text-align: center; padding: 20px; color: #6c757d; }
+                    .message-box { background: #e3f2fd; border: 1px solid #2196f3; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                    .success-box { background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                </style>
+            </head>
+            <body>
+                <div class='container'>
+                    <div class='header'>
+                        <i class='fas fa-check-circle fa-3x mb-3'></i>
+                        <h1>Réactivation d'Administration</h1>
+                        <p>{$cooperativeName}</p>
+                    </div>
+                    <div class='content'>
+                        <h2>Bonjour {$firstName},</h2>
+                        <p>Excellente nouvelle! Vos droits d'administration pour la coopérative <strong>{$cooperativeName}</strong> ont été rétablis par <strong>{$reactivatedByName}</strong>.</p>
+
+                        {$messageHtml}
+
+                        <div class='success-box'>
+                            <h4>🎉 Accès restauré!</h4>
+                            <p><strong>Vous pouvez désormais:</strong></p>
+                            <ul>
+                                <li>Accéder au tableau de bord administrateur</li>
+                                <li>Gérer les demandes d'adhésion</li>
+                                <li>Administrer la coopérative</li>
+                                <li>Utiliser toutes les fonctionnalités d'administration</li>
+                            </ul>
+                        </div>
+
+                        <div style='text-align: center; margin: 30px 0;'>
+                            <a href='" . url('/login') . "' class='button'>Se connecter maintenant</a>
+                        </div>
+
+                        <p>Bienvenue de nouveau dans l'équipe d'administration de <strong>{$cooperativeName}</strong>!</p>
+                    </div>
+                    <div class='footer'>
+                        <p>&copy; " . date('Y') . " Coopérative E-commerce. Tous droits réservés.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        ";
+
+        $mail->send();
+        return true;
+    } catch (Exception $e) {
+        Log::error('Admin reactivated notification email failed', [
+            'email' => $email,
+            'cooperative' => $cooperativeName,
+            'error' => $e->getMessage()
+        ]);
+        return false;
+    }
+}
+
 }

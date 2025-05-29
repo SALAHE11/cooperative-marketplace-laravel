@@ -112,7 +112,7 @@
         </div>
     </div>
 
-    <!-- NEW: Admin Management Section -->
+    <!-- UPDATED: Admin Management Section with 3 tabs -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="card shadow">
@@ -130,6 +130,13 @@
                                 <i class="fas fa-users me-1"></i>
                                 Administrateurs Actuels
                                 <span class="badge bg-primary ms-1" id="currentAdminsCount">0</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="inactive-admins-tab" data-bs-toggle="tab" data-bs-target="#inactive-admins" type="button" role="tab">
+                                <i class="fas fa-user-slash me-1"></i>
+                                Administrateurs Inactifs
+                                <span class="badge bg-secondary ms-1" id="inactiveAdminsCount">0</span>
                             </button>
                         </li>
                     </ul>
@@ -156,6 +163,18 @@
                                         <span class="visually-hidden">Chargement...</span>
                                     </div>
                                     <p class="mt-2 text-muted">Chargement des administrateurs...</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- NEW: Inactive Admins Tab -->
+                        <div class="tab-pane fade" id="inactive-admins" role="tabpanel">
+                            <div id="inactiveAdminsContent">
+                                <div class="text-center py-4">
+                                    <div class="spinner-border text-secondary" role="status">
+                                        <span class="visually-hidden">Chargement...</span>
+                                    </div>
+                                    <p class="mt-2 text-muted">Chargement des administrateurs inactifs...</p>
                                 </div>
                             </div>
                         </div>
@@ -405,26 +424,111 @@
 <div class="modal fade" id="removeAdminModal" tabindex="-1" aria-labelledby="removeAdminModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
+            <div class="modal-header bg-warning text-dark">
                 <h5 class="modal-title" id="removeAdminModalLabel">
                     <i class="fas fa-exclamation-triangle me-2"></i>
+                    Confirmer le Retrait Temporaire
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Retrait temporaire:</strong> Cette action peut être annulée depuis l'onglet "Administrateurs Inactifs".
+                </div>
+                <p>Êtes-vous sûr de vouloir retirer temporairement <strong id="adminToRemoveName"></strong> de l'administration de la coopérative?</p>
+
+                <div class="mb-3">
+                    <label for="removalReason" class="form-label">Motif du retrait (optionnel)</label>
+                    <textarea class="form-control" id="removalReason" rows="3" placeholder="Expliquez la raison du retrait..."></textarea>
+                    <small class="form-text text-muted">Ce motif sera inclus dans l'email de notification.</small>
+                </div>
+
+                <p class="text-muted small">L'administrateur sera notifié par email et pourra être réactivé ultérieurement.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-warning" id="confirmRemoveBtn">
+                    <i class="fas fa-user-minus me-1"></i>
                     Confirmer le Retrait
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- NEW: Admin Reactivation Modal -->
+<div class="modal fade" id="reactivateAdminModal" tabindex="-1" aria-labelledby="reactivateAdminModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="reactivateAdminModalLabel">
+                    <i class="fas fa-user-check me-2"></i>
+                    Confirmer la Réactivation
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <div class="alert alert-warning">
-                    <i class="fas fa-warning me-2"></i>
-                    <strong>Attention!</strong> Cette action est irréversible.
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>
+                    <strong>Réactivation:</strong> L'administrateur retrouvera tous ses droits d'accès.
                 </div>
-                <p>Êtes-vous sûr de vouloir retirer <strong id="adminToRemoveName"></strong> de l'administration de la coopérative?</p>
-                <p class="text-muted small">L'administrateur sera notifié par email et perdra immédiatement l'accès aux fonctionnalités d'administration.</p>
+                <p>Êtes-vous sûr de vouloir réactiver <strong id="adminToReactivateName"></strong> comme administrateur de la coopérative?</p>
+
+                <div class="mb-3">
+                    <label for="reactivationMessage" class="form-label">Message de bienvenue (optionnel)</label>
+                    <textarea class="form-control" id="reactivationMessage" rows="3" placeholder="Message de bienvenue pour le retour de l'administrateur..."></textarea>
+                    <small class="form-text text-muted">Ce message sera inclus dans l'email de réactivation.</small>
+                </div>
+
+                <p class="text-muted small">L'administrateur sera notifié par email et pourra immédiatement accéder au tableau de bord.</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                <button type="button" class="btn btn-danger" id="confirmRemoveBtn">
-                    <i class="fas fa-user-minus me-1"></i>
-                    Confirmer le Retrait
+                <button type="button" class="btn btn-success" id="confirmReactivateBtn">
+                    <i class="fas fa-user-check me-1"></i>
+                    Confirmer la Réactivation
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- NEW: Permanent Removal Confirmation Modal -->
+<div class="modal fade" id="permanentRemovalModal" tabindex="-1" aria-labelledby="permanentRemovalModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="permanentRemovalModalLabel">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Confirmer le Retrait Définitif
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <i class="fas fa-warning me-2"></i>
+                    <strong>Action irréversible!</strong> Cette action ne peut pas être annulée.
+                </div>
+                <p>Êtes-vous sûr de vouloir définitivement retirer <strong id="adminToPermanentlyRemoveName"></strong> de la coopérative?</p>
+
+                <div class="alert alert-info">
+                    <h6>Conséquences:</h6>
+                    <ul class="mb-0">
+                        <li>L'administrateur sera converti en client régulier</li>
+                        <li>Tous les liens avec la coopérative seront supprimés</li>
+                        <li>Cette action ne peut pas être annulée</li>
+                        <li>Le compte utilisateur reste actif (pas supprimé)</li>
+                    </ul>
+                </div>
+
+                <p class="text-muted small"><strong>Note:</strong> L'utilisateur pourra toujours utiliser son compte comme client ou rejoindre d'autres coopératives.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-danger" id="confirmPermanentRemovalBtn">
+                    <i class="fas fa-user-times me-1"></i>
+                    Retirer Définitivement
                 </button>
             </div>
         </div>
@@ -486,6 +590,19 @@
     margin-bottom: 1rem;
     opacity: 0.5;
 }
+
+.inactive-admin-card {
+    border-left: 4px solid #6c757d;
+    background: #f8f9fa;
+}
+
+.removal-info {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 0.25rem;
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+}
 </style>
 @endsection
 
@@ -500,13 +617,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const requestDetailsModal = new bootstrap.Modal(document.getElementById('requestDetailsModal'));
     const responseModal = new bootstrap.Modal(document.getElementById('responseModal'));
     const removeAdminModal = new bootstrap.Modal(document.getElementById('removeAdminModal'));
+    const reactivateAdminModal = new bootstrap.Modal(document.getElementById('reactivateAdminModal'));
+    const permanentRemovalModal = new bootstrap.Modal(document.getElementById('permanentRemovalModal'));
 
     // Load initial data
     loadPendingRequests();
 
-    // Tab change handler
+    // Tab change handlers
     document.getElementById('current-admins-tab').addEventListener('click', function() {
         loadCurrentAdmins();
+    });
+
+    document.getElementById('inactive-admins-tab').addEventListener('click', function() {
+        loadInactiveAdmins();
     });
 
     // Load pending requests
@@ -537,6 +660,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     updateAdminsCount(data.admins.length);
                 } else {
                     showError('Erreur lors du chargement des administrateurs');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showError('Erreur de connexion');
+            });
+    }
+
+    // NEW: Load inactive admins
+    function loadInactiveAdmins() {
+        fetch('{{ route("coop.admin-requests.inactive-admins") }}')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayInactiveAdmins(data.inactive_admins);
+                    updateInactiveAdminsCount(data.inactive_admins.length);
+                } else {
+                    showError('Erreur lors du chargement des administrateurs inactifs');
                 }
             })
             .catch(error => {
@@ -649,7 +790,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 </td>
                                 <td>
                                     ${!admin.is_current_user ? `
-                                        <button class="btn btn-outline-danger btn-sm" onclick="showRemoveAdminModal(${admin.id}, '${admin.full_name}')">
+                                        <button class="btn btn-outline-warning btn-sm" onclick="showRemoveAdminModal(${admin.id}, '${admin.full_name}')">
                                             <i class="fas fa-user-minus"></i>
                                         </button>
                                     ` : '<span class="text-muted">-</span>'}
@@ -660,6 +801,63 @@ document.addEventListener('DOMContentLoaded', function() {
                 </table>
             </div>
         `;
+    }
+
+    // NEW: Display inactive admins
+    function displayInactiveAdmins(inactiveAdmins) {
+        const container = document.getElementById('inactiveAdminsContent');
+
+        if (inactiveAdmins.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-user-slash"></i>
+                    <h5>Aucun administrateur inactif</h5>
+                    <p class="text-muted">Il n'y a actuellement aucun administrateur suspendu.</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = inactiveAdmins.map(admin => `
+            <div class="card inactive-admin-card mb-3">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-auto">
+                            <div class="admin-avatar bg-secondary">
+                                ${admin.full_name.charAt(0).toUpperCase()}
+                            </div>
+                        </div>
+                        <div class="col">
+                            <h6 class="mb-1">${admin.full_name}</h6>
+                            <p class="mb-1 text-muted small">
+                                <i class="fas fa-envelope me-1"></i>
+                                ${admin.email}
+                            </p>
+                            <p class="mb-0 text-muted small">
+                                <i class="fas fa-user-minus me-1"></i>
+                                Retiré ${admin.removed_at_human} par ${admin.removed_by}
+                            </p>
+                        </div>
+                        <div class="col-auto">
+                            <span class="badge bg-secondary status-badge">Suspendu</span>
+                            <div class="mt-2">
+                                <button class="btn btn-success btn-sm me-1" onclick="showReactivateAdminModal(${admin.id}, '${admin.full_name}')">
+                                    <i class="fas fa-user-check"></i>
+                                </button>
+                                <button class="btn btn-danger btn-sm" onclick="showPermanentRemovalModal(${admin.id}, '${admin.full_name}')">
+                                    <i class="fas fa-user-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    ${admin.removal_reason ? `
+                        <div class="removal-info mt-2">
+                            <small><strong>Motif:</strong> ${admin.removal_reason}</small>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `).join('');
     }
 
     // Show request details
@@ -803,6 +1001,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 responseModal.hide();
                 showSuccess(data.message);
                 loadPendingRequests(); // Refresh the list
+                if (currentAction === 'approve') {
+                    loadCurrentAdmins(); // Also refresh current admins if approved
+                }
             } else {
                 showError(data.message || 'Erreur lors du traitement');
             }
@@ -818,11 +1019,14 @@ document.addEventListener('DOMContentLoaded', function() {
     window.showRemoveAdminModal = function(adminId, adminName) {
         currentAdminId = adminId;
         document.getElementById('adminToRemoveName').textContent = adminName;
+        document.getElementById('removalReason').value = '';
         removeAdminModal.show();
     };
 
     // Confirm admin removal
     document.getElementById('confirmRemoveBtn').addEventListener('click', function() {
+        const removalReason = document.getElementById('removalReason').value.trim();
+
         showLoading(this);
 
         fetch(`{{ url('/coop/admins') }}/${currentAdminId}/remove`, {
@@ -830,7 +1034,10 @@ document.addEventListener('DOMContentLoaded', function() {
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-            }
+            },
+            body: JSON.stringify({
+                removal_reason: removalReason
+            })
         })
         .then(response => response.json())
         .then(data => {
@@ -839,13 +1046,95 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.success) {
                 removeAdminModal.hide();
                 showSuccess(data.message);
-                loadCurrentAdmins(); // Refresh the list
+                loadCurrentAdmins(); // Refresh current admins
+                loadInactiveAdmins(); // Refresh inactive admins
             } else {
                 showError(data.message || 'Erreur lors du retrait');
             }
         })
         .catch(error => {
             hideLoading(document.getElementById('confirmRemoveBtn'));
+            console.error('Error:', error);
+            showError('Erreur de connexion');
+        });
+    });
+
+    // NEW: Show reactivate admin modal
+    window.showReactivateAdminModal = function(adminId, adminName) {
+        currentAdminId = adminId;
+        document.getElementById('adminToReactivateName').textContent = adminName;
+        document.getElementById('reactivationMessage').value = '';
+        reactivateAdminModal.show();
+    };
+
+    // NEW: Confirm admin reactivation
+    document.getElementById('confirmReactivateBtn').addEventListener('click', function() {
+        const reactivationMessage = document.getElementById('reactivationMessage').value.trim();
+
+        showLoading(this);
+
+        fetch(`{{ url('/coop/admins') }}/${currentAdminId}/reactivate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({
+                reactivation_message: reactivationMessage
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            hideLoading(document.getElementById('confirmReactivateBtn'));
+
+            if (data.success) {
+                reactivateAdminModal.hide();
+                showSuccess(data.message);
+                loadCurrentAdmins(); // Refresh current admins
+                loadInactiveAdmins(); // Refresh inactive admins
+            } else {
+                showError(data.message || 'Erreur lors de la réactivation');
+            }
+        })
+        .catch(error => {
+            hideLoading(document.getElementById('confirmReactivateBtn'));
+            console.error('Error:', error);
+            showError('Erreur de connexion');
+        });
+    });
+
+    // NEW: Show permanent removal modal
+    window.showPermanentRemovalModal = function(adminId, adminName) {
+        currentAdminId = adminId;
+        document.getElementById('adminToPermanentlyRemoveName').textContent = adminName;
+        permanentRemovalModal.show();
+    };
+
+    // NEW: Confirm permanent removal
+    document.getElementById('confirmPermanentRemovalBtn').addEventListener('click', function() {
+        showLoading(this);
+
+        fetch(`{{ url('/coop/admins') }}/${currentAdminId}/permanently-remove`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            hideLoading(document.getElementById('confirmPermanentRemovalBtn'));
+
+            if (data.success) {
+                permanentRemovalModal.hide();
+                showSuccess(data.message);
+                loadInactiveAdmins(); // Refresh inactive admins
+            } else {
+                showError(data.message || 'Erreur lors du retrait définitif');
+            }
+        })
+        .catch(error => {
+            hideLoading(document.getElementById('confirmPermanentRemovalBtn'));
             console.error('Error:', error);
             showError('Erreur de connexion');
         });
@@ -858,6 +1147,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function updateAdminsCount(count) {
         document.getElementById('currentAdminsCount').textContent = count;
+    }
+
+    function updateInactiveAdminsCount(count) {
+        document.getElementById('inactiveAdminsCount').textContent = count;
     }
 
     // Utility functions
