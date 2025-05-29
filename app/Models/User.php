@@ -94,4 +94,6 @@ public function cooperativeAdminRequests()
 {
     return $this->hasMany(CooperativeAdminRequest::class);
 }
+
+
 }

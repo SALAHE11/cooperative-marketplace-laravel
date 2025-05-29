@@ -1,4 +1,6 @@
 <?php
+// ===== 1. UPDATED CONTROLLER WITH SIMPLIFIED QUERIES =====
+// File: app/Http/Controllers/CooperativeRequestManagementController.php
 
 namespace App\Http\Controllers;
 
@@ -70,10 +72,10 @@ class CooperativeRequestManagementController extends Controller
             return response()->json(['success' => false, 'message' => 'Accès non autorisé'], 403);
         }
 
+        // Get active admins for this cooperative
         $admins = User::where('cooperative_id', $user->cooperative_id)
             ->where('role', 'cooperative_admin')
             ->where('status', 'active')
-            ->whereNull('removed_from_coop_at')
             ->orderBy('created_at', 'asc')
             ->get();
 
@@ -94,7 +96,7 @@ class CooperativeRequestManagementController extends Controller
     }
 
     /**
-     * NEW: Get inactive cooperative admins
+     * FIXED: Get inactive cooperative admins - Simplified query
      */
     public function getInactiveAdmins()
     {
@@ -105,38 +107,70 @@ class CooperativeRequestManagementController extends Controller
             return response()->json(['success' => false, 'message' => 'Accès non autorisé'], 403);
         }
 
-        $inactiveAdmins = User::with(['removedBy'])
-            ->where('role', 'cooperative_admin')
-            ->where('status', 'suspended')
-            ->whereNotNull('removed_from_coop_at')
-            ->where(function($query) use ($user) {
-                // Include admins who were part of this cooperative
-                $query->where('cooperative_id', $user->cooperative_id)
-                      ->orWhereHas('cooperativeAdminRequests', function($subQuery) use ($user) {
-                          $subQuery->where('cooperative_id', $user->cooperative_id)
-                                   ->where('status', 'approved');
-                      });
-            })
-            ->orderBy('removed_from_coop_at', 'desc')
-            ->get();
+        // First, get all suspended users who are cooperative admins
+        $baseQuery = User::where('role', 'cooperative_admin')
+            ->where('status', 'suspended');
 
-        return response()->json([
-            'success' => true,
-            'inactive_admins' => $inactiveAdmins->map(function($admin) {
-                return [
-                    'id' => $admin->id,
-                    'full_name' => $admin->getFullNameAttribute(),
-                    'email' => $admin->email,
-                    'phone' => $admin->phone,
-                    'joined_at' => $admin->created_at->format('d/m/Y'),
-                    'removed_at' => $admin->removed_from_coop_at ? $admin->removed_from_coop_at->format('d/m/Y à H:i') : null,
-                    'removed_at_human' => $admin->removed_from_coop_at ? $admin->removed_from_coop_at->diffForHumans() : null,
-                    'removed_by' => $admin->removedBy ? $admin->removedBy->getFullNameAttribute() : 'Système',
-                    'removal_reason' => $admin->removal_reason,
-                    'last_login' => $admin->last_login_at ? $admin->last_login_at->format('d/m/Y H:i') : 'Jamais connecté',
-                ];
-            })
-        ]);
+        // Check if the removal tracking columns exist
+        try {
+            // Test if the columns exist by running a small query
+            DB::select('SELECT removed_from_coop_at FROM users LIMIT 1');
+
+            // If no exception, columns exist - use the full query
+            $inactiveAdmins = $baseQuery
+                ->where(function($query) use ($user) {
+                    $query->where('cooperative_id', $user->cooperative_id)
+                          ->orWhere('removed_from_coop_at', '!=', null);
+                })
+                ->with(['removedBy'])
+                ->orderBy('updated_at', 'desc')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'inactive_admins' => $inactiveAdmins->map(function($admin) {
+                    return [
+                        'id' => $admin->id,
+                        'full_name' => $admin->getFullNameAttribute(),
+                        'email' => $admin->email,
+                        'phone' => $admin->phone,
+                        'joined_at' => $admin->created_at->format('d/m/Y'),
+                        'removed_at' => isset($admin->removed_from_coop_at) ? $admin->removed_from_coop_at->format('d/m/Y à H:i') : 'Non défini',
+                        'removed_at_human' => isset($admin->removed_from_coop_at) ? $admin->removed_from_coop_at->diffForHumans() : 'Non défini',
+                        'removed_by' => isset($admin->removedBy) ? $admin->removedBy->getFullNameAttribute() : 'Système',
+                        'removal_reason' => $admin->removal_reason ?? null,
+                        'last_login' => $admin->last_login_at ? $admin->last_login_at->format('d/m/Y H:i') : 'Jamais connecté',
+                    ];
+                })
+            ]);
+
+        } catch (\Exception $e) {
+            // Columns don't exist yet - use simple query
+            Log::info('Removal tracking columns not found, using simple query', ['error' => $e->getMessage()]);
+
+            $inactiveAdmins = $baseQuery
+                ->where('cooperative_id', $user->cooperative_id)
+                ->orderBy('updated_at', 'desc')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'inactive_admins' => $inactiveAdmins->map(function($admin) {
+                    return [
+                        'id' => $admin->id,
+                        'full_name' => $admin->getFullNameAttribute(),
+                        'email' => $admin->email,
+                        'phone' => $admin->phone,
+                        'joined_at' => $admin->created_at->format('d/m/Y'),
+                        'removed_at' => 'Migration requise',
+                        'removed_at_human' => 'Migration requise',
+                        'removed_by' => 'Système',
+                        'removal_reason' => null,
+                        'last_login' => $admin->last_login_at ? $admin->last_login_at->format('d/m/Y H:i') : 'Jamais connecté',
+                    ];
+                })
+            ]);
+        }
     }
 
     /**
@@ -179,15 +213,24 @@ class CooperativeRequestManagementController extends Controller
             // Approve the request
             $joinRequest->approve($currentUser->id, $request->response_message);
 
-            // Update the user
-            $newAdmin = $joinRequest->user;
-            $newAdmin->update([
+            // Update the user - clear any suspension fields
+            $updateData = [
                 'cooperative_id' => $currentUser->cooperative_id,
                 'status' => 'active',
-                'removed_from_coop_at' => null,
-                'removed_by' => null,
-                'removal_reason' => null,
-            ]);
+            ];
+
+            // Only set removal fields if columns exist
+            try {
+                DB::select('SELECT removed_from_coop_at FROM users LIMIT 1');
+                $updateData['removed_from_coop_at'] = null;
+                $updateData['removed_by'] = null;
+                $updateData['removal_reason'] = null;
+            } catch (\Exception $e) {
+                // Columns don't exist, skip them
+            }
+
+            $newAdmin = $joinRequest->user;
+            $newAdmin->update($updateData);
 
             // Send approval email
             $emailSent = EmailService::sendJoinRequestResponse(
@@ -397,7 +440,7 @@ class CooperativeRequestManagementController extends Controller
     }
 
     /**
-     * UPDATED: Remove an admin from cooperative (suspend with tracking)
+     * FIXED: Remove an admin from cooperative - Uses 'suspended' status
      */
     public function removeAdmin(Request $request, $adminId)
     {
@@ -432,7 +475,6 @@ class CooperativeRequestManagementController extends Controller
             ->where('cooperative_id', $currentUser->cooperative_id)
             ->where('role', 'cooperative_admin')
             ->where('status', 'active')
-            ->whereNull('removed_from_coop_at')
             ->first();
 
         if (!$adminToRemove) {
@@ -440,14 +482,23 @@ class CooperativeRequestManagementController extends Controller
         }
 
         try {
-            // Suspend the admin with tracking info
-            $adminToRemove->update([
-                'status' => 'suspended', // Fixed: Use 'suspended' instead of 'inactive'
-                'removed_from_coop_at' => now(),
-                'removed_by' => $currentUser->id,
-                'removal_reason' => $request->removal_reason,
-                // Keep cooperative_id for tracking purposes
-            ]);
+            // Prepare update data
+            $updateData = [
+                'status' => 'suspended', // FIXED: Use 'suspended' not 'inactive'
+            ];
+
+            // Only set removal tracking fields if columns exist
+            try {
+                DB::select('SELECT removed_from_coop_at FROM users LIMIT 1');
+                $updateData['removed_from_coop_at'] = now();
+                $updateData['removed_by'] = $currentUser->id;
+                $updateData['removal_reason'] = $request->removal_reason;
+            } catch (\Exception $e) {
+                Log::info('Removal tracking columns not found, using basic suspension');
+            }
+
+            // Update the admin
+            $adminToRemove->update($updateData);
 
             // Send notification email
             EmailService::sendAdminRemovedNotification(
@@ -485,7 +536,7 @@ class CooperativeRequestManagementController extends Controller
     }
 
     /**
-     * NEW: Reactivate an admin
+     * FIXED: Reactivate an admin
      */
     public function reactivateAdmin(Request $request, $adminId)
     {
@@ -511,7 +562,6 @@ class CooperativeRequestManagementController extends Controller
         $adminToReactivate = User::where('id', $adminId)
             ->where('role', 'cooperative_admin')
             ->where('status', 'suspended')
-            ->whereNotNull('removed_from_coop_at')
             ->first();
 
         if (!$adminToReactivate) {
@@ -519,14 +569,24 @@ class CooperativeRequestManagementController extends Controller
         }
 
         try {
-            // Reactivate the admin
-            $adminToReactivate->update([
+            // Prepare reactivation data
+            $updateData = [
                 'status' => 'active',
                 'cooperative_id' => $currentUser->cooperative_id,
-                'removed_from_coop_at' => null,
-                'removed_by' => null,
-                'removal_reason' => null,
-            ]);
+            ];
+
+            // Only clear removal tracking fields if columns exist
+            try {
+                DB::select('SELECT removed_from_coop_at FROM users LIMIT 1');
+                $updateData['removed_from_coop_at'] = null;
+                $updateData['removed_by'] = null;
+                $updateData['removal_reason'] = null;
+            } catch (\Exception $e) {
+                Log::info('Removal tracking columns not found');
+            }
+
+            // Reactivate the admin
+            $adminToReactivate->update($updateData);
 
             // Send reactivation email
             EmailService::sendAdminReactivatedNotification(
@@ -577,7 +637,6 @@ class CooperativeRequestManagementController extends Controller
         $adminToDelete = User::where('id', $adminId)
             ->where('role', 'cooperative_admin')
             ->where('status', 'suspended')
-            ->whereNotNull('removed_from_coop_at')
             ->first();
 
         if (!$adminToDelete) {
@@ -585,15 +644,25 @@ class CooperativeRequestManagementController extends Controller
         }
 
         try {
-            // Keep user account but completely remove from cooperative system
-            $adminToDelete->update([
+            // Prepare permanent removal data
+            $updateData = [
                 'role' => 'client', // Convert back to regular client
                 'cooperative_id' => null,
-                'removed_from_coop_at' => null,
-                'removed_by' => null,
-                'removal_reason' => null,
                 'status' => 'active', // Reactivate as regular client
-            ]);
+            ];
+
+            // Only clear removal tracking fields if columns exist
+            try {
+                DB::select('SELECT removed_from_coop_at FROM users LIMIT 1');
+                $updateData['removed_from_coop_at'] = null;
+                $updateData['removed_by'] = null;
+                $updateData['removal_reason'] = null;
+            } catch (\Exception $e) {
+                Log::info('Removal tracking columns not found');
+            }
+
+            // Keep user account but completely remove from cooperative system
+            $adminToDelete->update($updateData);
 
             // Delete related cooperative admin requests
             CooperativeAdminRequest::where('user_id', $adminId)
