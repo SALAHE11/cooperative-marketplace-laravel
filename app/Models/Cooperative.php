@@ -26,6 +26,7 @@ class Cooperative extends Model
         'suspended_at',
         'suspension_reason',
         'suspended_by',
+        'primary_admin_id', // NEW: Primary admin field
     ];
 
     protected $casts = [
@@ -64,6 +65,18 @@ class Cooperative extends Model
         return $this->belongsTo(User::class, 'suspended_by');
     }
 
+    // NEW: Primary admin relationship
+    public function primaryAdmin()
+    {
+        return $this->belongsTo(User::class, 'primary_admin_id');
+    }
+
+    // NEW: Get all active admins for this cooperative
+    public function activeAdmins()
+    {
+        return $this->hasMany(User::class)->where('role', 'cooperative_admin')->where('status', 'active');
+    }
+
     // Helper method to check if cooperative email is verified
     public function isEmailVerified()
     {
@@ -89,6 +102,18 @@ class Cooperative extends Model
     public function hasLogo()
     {
         return !empty($this->logo_path) && Storage::disk('public')->exists($this->logo_path);
+    }
+
+    // NEW: Check if user is the primary admin of this cooperative
+    public function isPrimaryAdmin($userId)
+    {
+        return $this->primary_admin_id === $userId;
+    }
+
+    // NEW: Set primary admin
+    public function setPrimaryAdmin($userId)
+    {
+        $this->update(['primary_admin_id' => $userId]);
     }
 
     // Clean up logo when cooperative is deleted

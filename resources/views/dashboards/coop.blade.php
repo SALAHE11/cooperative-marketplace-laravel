@@ -15,6 +15,12 @@
                         @if(Auth::user()->cooperative)
                             - {{ Auth::user()->cooperative->name }}
                         @endif
+                        @if(Auth::user()->isPrimaryAdmin())
+                            <span class="badge bg-warning text-dark ms-2">
+                                <i class="fas fa-crown me-1"></i>
+                                Administrateur Principal
+                            </span>
+                        @endif
                     </p>
                 </div>
                 <div class="text-end">
@@ -112,7 +118,8 @@
         </div>
     </div>
 
-    <!-- UPDATED: Admin Management Section with 3 tabs -->
+    <!-- ADMIN MANAGEMENT SECTION - ONLY FOR PRIMARY ADMIN -->
+    @if(Auth::user()->isPrimaryAdmin())
     <div class="row mb-4">
         <div class="col-12">
             <div class="card shadow">
@@ -167,7 +174,7 @@
                             </div>
                         </div>
 
-                        <!-- NEW: Inactive Admins Tab -->
+                        <!-- Inactive Admins Tab -->
                         <div class="tab-pane fade" id="inactive-admins" role="tabpanel">
                             <div id="inactiveAdminsContent">
                                 <div class="text-center py-4">
@@ -183,6 +190,52 @@
             </div>
         </div>
     </div>
+    @else
+    <!-- MESSAGE FOR NON-PRIMARY ADMINS -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header py-3 bg-info text-white">
+                    <h6 class="m-0 font-weight-bold">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Statut Administrateur
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-auto">
+                            <i class="fas fa-user-shield fa-3x text-info"></i>
+                        </div>
+                        <div class="col">
+                            <h5 class="text-info mb-2">Administrateur de Coopérative</h5>
+                            <p class="mb-1">Vous êtes administrateur de <strong>{{ Auth::user()->cooperative->name }}</strong></p>
+                            <p class="mb-0 text-muted">
+                                <i class="fas fa-crown me-1 text-warning"></i>
+                                La gestion des autres administrateurs est réservée à l'administrateur principal
+                            </p>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <div class="alert alert-light">
+                                <h6 class="alert-heading">
+                                    <i class="fas fa-tasks me-2"></i>
+                                    Vos responsabilités
+                                </h6>
+                                <ul class="mb-0">
+                                    <li>Gestion des produits de la coopérative</li>
+                                    <li>Traitement des commandes clients</li>
+                                    <li>Suivi des stocks et inventaires</li>
+                                    <li>Support client et communication</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
 
     <!-- Content Row -->
     <div class="row">
@@ -303,6 +356,14 @@
                         <i class="fas fa-calendar me-2"></i>
                         Créée le {{ Auth::user()->cooperative->date_created->format('d/m/Y') }}
                     </p>
+                    @if(Auth::user()->isPrimaryAdmin())
+                        <div class="mt-3 pt-2 border-top">
+                            <small class="text-warning">
+                                <i class="fas fa-crown me-1"></i>
+                                Vous êtes l'administrateur principal de cette coopérative
+                            </small>
+                        </div>
+                    @endif
                 </div>
             </div>
             @endif
@@ -356,6 +417,8 @@
     </div>
 </div>
 
+<!-- MODALS - ONLY FOR PRIMARY ADMIN -->
+@if(Auth::user()->isPrimaryAdmin())
 <!-- Request Details Modal -->
 <div class="modal fade" id="requestDetailsModal" tabindex="-1" aria-labelledby="requestDetailsModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
@@ -457,7 +520,7 @@
     </div>
 </div>
 
-<!-- NEW: Admin Reactivation Modal -->
+<!-- Admin Reactivation Modal -->
 <div class="modal fade" id="reactivateAdminModal" tabindex="-1" aria-labelledby="reactivateAdminModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -494,7 +557,7 @@
     </div>
 </div>
 
-<!-- NEW: Permanent Removal Confirmation Modal -->
+<!-- Permanent Removal Confirmation Modal -->
 <div class="modal fade" id="permanentRemovalModal" tabindex="-1" aria-labelledby="permanentRemovalModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -534,6 +597,8 @@
         </div>
     </div>
 </div>
+@endif
+<!-- END MODALS FOR PRIMARY ADMIN -->
 
 <style>
 .border-left-primary { border-left: 0.25rem solid #4e73df !important; }
@@ -609,11 +674,21 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Check if user is primary admin - exit early if not
+    const isPrimaryAdmin = {{ Auth::user()->isPrimaryAdmin() ? 'true' : 'false' }};
+
+    if (!isPrimaryAdmin) {
+        // For non-primary admins, exit early - no admin management features
+        console.log('Non-primary admin: Admin management features are disabled');
+        return;
+    }
+
+    // === PRIMARY ADMIN ONLY CODE BELOW ===
     let currentRequestId = null;
     let currentAdminId = null;
     let currentAction = null;
 
-    // Modals
+    // Initialize modals (only exist for primary admin)
     const requestDetailsModal = new bootstrap.Modal(document.getElementById('requestDetailsModal'));
     const responseModal = new bootstrap.Modal(document.getElementById('responseModal'));
     const removeAdminModal = new bootstrap.Modal(document.getElementById('removeAdminModal'));
@@ -668,7 +743,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
-    // NEW: Load inactive admins
+    // Load inactive admins
     function loadInactiveAdmins() {
         fetch('{{ route("coop.admin-requests.inactive-admins") }}')
             .then(response => response.json())
@@ -779,6 +854,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         <div>
                                             ${admin.full_name}
                                             ${admin.is_current_user ? '<small class="text-primary d-block">(Vous)</small>' : ''}
+                                            ${admin.is_primary_admin ? '<small class="text-warning d-block"><i class="fas fa-crown me-1"></i>Admin Principal</small>' : ''}
                                         </div>
                                     </div>
                                 </td>
@@ -789,7 +865,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <small class="text-muted">${admin.last_login}</small>
                                 </td>
                                 <td>
-                                    ${!admin.is_current_user ? `
+                                    ${!admin.is_current_user && !admin.is_primary_admin ? `
                                         <button class="btn btn-outline-warning btn-sm" onclick="showRemoveAdminModal(${admin.id}, '${admin.full_name}')">
                                             <i class="fas fa-user-minus"></i>
                                         </button>
@@ -803,7 +879,7 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
     }
 
-    // NEW: Display inactive admins
+    // Display inactive admins
     function displayInactiveAdmins(inactiveAdmins) {
         const container = document.getElementById('inactiveAdminsContent');
 
@@ -828,7 +904,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>
                         </div>
                         <div class="col">
-                            <h6 class="mb-1">${admin.full_name}</h6>
+                            <h6 class="mb-1">
+                                ${admin.full_name}
+                                ${admin.is_primary_admin ? '<small class="text-warning ms-2"><i class="fas fa-crown me-1"></i>Ex-Admin Principal</small>' : ''}
+                            </h6>
                             <p class="mb-1 text-muted small">
                                 <i class="fas fa-envelope me-1"></i>
                                 ${admin.email}
@@ -841,12 +920,16 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="col-auto">
                             <span class="badge bg-secondary status-badge">Suspendu</span>
                             <div class="mt-2">
-                                <button class="btn btn-success btn-sm me-1" onclick="showReactivateAdminModal(${admin.id}, '${admin.full_name}')">
-                                    <i class="fas fa-user-check"></i>
-                                </button>
-                                <button class="btn btn-danger btn-sm" onclick="showPermanentRemovalModal(${admin.id}, '${admin.full_name}')">
-                                    <i class="fas fa-user-times"></i>
-                                </button>
+                                ${!admin.is_primary_admin ? `
+                                    <button class="btn btn-success btn-sm me-1" onclick="showReactivateAdminModal(${admin.id}, '${admin.full_name}')">
+                                        <i class="fas fa-user-check"></i>
+                                    </button>
+                                    <button class="btn btn-danger btn-sm" onclick="showPermanentRemovalModal(${admin.id}, '${admin.full_name}')">
+                                        <i class="fas fa-user-times"></i>
+                                    </button>
+                                ` : `
+                                    <span class="text-muted small">Ex-Admin Principal</span>
+                                `}
                             </div>
                         </div>
                     </div>
@@ -1059,7 +1142,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // NEW: Show reactivate admin modal
+    // Show reactivate admin modal
     window.showReactivateAdminModal = function(adminId, adminName) {
         currentAdminId = adminId;
         document.getElementById('adminToReactivateName').textContent = adminName;
@@ -1067,7 +1150,7 @@ document.addEventListener('DOMContentLoaded', function() {
         reactivateAdminModal.show();
     };
 
-    // NEW: Confirm admin reactivation
+    // Confirm admin reactivation
     document.getElementById('confirmReactivateBtn').addEventListener('click', function() {
         const reactivationMessage = document.getElementById('reactivationMessage').value.trim();
 
@@ -1103,14 +1186,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // NEW: Show permanent removal modal
+    // Show permanent removal modal
     window.showPermanentRemovalModal = function(adminId, adminName) {
         currentAdminId = adminId;
         document.getElementById('adminToPermanentlyRemoveName').textContent = adminName;
         permanentRemovalModal.show();
     };
 
-    // NEW: Confirm permanent removal
+    // Confirm permanent removal
     document.getElementById('confirmPermanentRemovalBtn').addEventListener('click', function() {
         showLoading(this);
 
@@ -1198,6 +1281,8 @@ document.addEventListener('DOMContentLoaded', function() {
             loadPendingRequests();
         }
     }, 30000);
+
+    // === END PRIMARY ADMIN ONLY CODE ===
 });
 </script>
 @endpush

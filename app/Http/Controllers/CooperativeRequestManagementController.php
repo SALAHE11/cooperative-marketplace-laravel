@@ -1,5 +1,4 @@
 <?php
-// ===== 1. UPDATED CONTROLLER WITH SIMPLIFIED QUERIES =====
 // File: app/Http/Controllers/CooperativeRequestManagementController.php
 
 namespace App\Http\Controllers;
@@ -23,9 +22,9 @@ class CooperativeRequestManagementController extends Controller
     }
 
     /**
-     * Get pending requests for the cooperative
+     * NEW: Check if user is primary admin - Helper method
      */
-    public function getPendingRequests()
+    private function checkPrimaryAdminAccess()
     {
         /** @var User $user */
         $user = Auth::user();
@@ -33,6 +32,28 @@ class CooperativeRequestManagementController extends Controller
         if (!$user->isCooperativeAdmin() || !$user->cooperative) {
             return response()->json(['success' => false, 'message' => 'Accès non autorisé'], 403);
         }
+
+        if (!$user->isPrimaryAdmin()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Seul l\'administrateur principal peut gérer les autres administrateurs'
+            ], 403);
+        }
+
+        return null; // No error
+    }
+
+    /**
+     * Get pending requests for the cooperative - PRIMARY ADMIN ONLY
+     */
+    public function getPendingRequests()
+    {
+        // NEW: Check primary admin access
+        $accessCheck = $this->checkPrimaryAdminAccess();
+        if ($accessCheck) return $accessCheck;
+
+        /** @var User $user */
+        $user = Auth::user();
 
         $requests = CooperativeAdminRequest::with(['user'])
             ->where('cooperative_id', $user->cooperative_id)
@@ -61,16 +82,16 @@ class CooperativeRequestManagementController extends Controller
     }
 
     /**
-     * Get current cooperative admins
+     * Get current cooperative admins - PRIMARY ADMIN ONLY
      */
     public function getCurrentAdmins()
     {
+        // NEW: Check primary admin access
+        $accessCheck = $this->checkPrimaryAdminAccess();
+        if ($accessCheck) return $accessCheck;
+
         /** @var User $user */
         $user = Auth::user();
-
-        if (!$user->isCooperativeAdmin() || !$user->cooperative) {
-            return response()->json(['success' => false, 'message' => 'Accès non autorisé'], 403);
-        }
 
         // Get active admins for this cooperative
         $admins = User::where('cooperative_id', $user->cooperative_id)
@@ -90,22 +111,23 @@ class CooperativeRequestManagementController extends Controller
                     'joined_at' => $admin->created_at->format('d/m/Y'),
                     'last_login' => $admin->last_login_at ? $admin->last_login_at->format('d/m/Y H:i') : 'Jamais connecté',
                     'is_current_user' => $admin->id === Auth::id(),
+                    'is_primary_admin' => $admin->isPrimaryAdmin(), // NEW: Mark primary admin
                 ];
             })
         ]);
     }
 
     /**
-     * FIXED: Get inactive cooperative admins - Simplified query
+     * Get inactive cooperative admins - PRIMARY ADMIN ONLY
      */
     public function getInactiveAdmins()
     {
+        // NEW: Check primary admin access
+        $accessCheck = $this->checkPrimaryAdminAccess();
+        if ($accessCheck) return $accessCheck;
+
         /** @var User $user */
         $user = Auth::user();
-
-        if (!$user->isCooperativeAdmin() || !$user->cooperative) {
-            return response()->json(['success' => false, 'message' => 'Accès non autorisé'], 403);
-        }
 
         // First, get all suspended users who are cooperative admins
         $baseQuery = User::where('role', 'cooperative_admin')
@@ -140,6 +162,7 @@ class CooperativeRequestManagementController extends Controller
                         'removed_by' => isset($admin->removedBy) ? $admin->removedBy->getFullNameAttribute() : 'Système',
                         'removal_reason' => $admin->removal_reason ?? null,
                         'last_login' => $admin->last_login_at ? $admin->last_login_at->format('d/m/Y H:i') : 'Jamais connecté',
+                        'is_primary_admin' => $admin->isPrimaryAdmin(), // NEW: Mark if was primary admin
                     ];
                 })
             ]);
@@ -167,6 +190,7 @@ class CooperativeRequestManagementController extends Controller
                         'removed_by' => 'Système',
                         'removal_reason' => null,
                         'last_login' => $admin->last_login_at ? $admin->last_login_at->format('d/m/Y H:i') : 'Jamais connecté',
+                        'is_primary_admin' => $admin->isPrimaryAdmin(), // NEW: Mark if was primary admin
                     ];
                 })
             ]);
@@ -174,10 +198,14 @@ class CooperativeRequestManagementController extends Controller
     }
 
     /**
-     * Approve a join request
+     * Approve a join request - PRIMARY ADMIN ONLY
      */
     public function approveRequest(Request $request, $requestId)
     {
+        // NEW: Check primary admin access
+        $accessCheck = $this->checkPrimaryAdminAccess();
+        if ($accessCheck) return $accessCheck;
+
         $validator = Validator::make($request->all(), [
             'response_message' => 'nullable|string|max:500',
         ]);
@@ -192,10 +220,6 @@ class CooperativeRequestManagementController extends Controller
 
         /** @var User $currentUser */
         $currentUser = Auth::user();
-
-        if (!$currentUser->isCooperativeAdmin() || !$currentUser->cooperative) {
-            return response()->json(['success' => false, 'message' => 'Accès non autorisé'], 403);
-        }
 
         $joinRequest = CooperativeAdminRequest::with(['user'])
             ->where('id', $requestId)
@@ -254,7 +278,8 @@ class CooperativeRequestManagementController extends Controller
                 'request_id' => $requestId,
                 'approved_by' => $currentUser->id,
                 'new_admin' => $newAdmin->id,
-                'cooperative_id' => $currentUser->cooperative_id
+                'cooperative_id' => $currentUser->cooperative_id,
+                'approved_by_primary_admin' => $currentUser->isPrimaryAdmin() // NEW: Log primary admin action
             ]);
 
             return response()->json([
@@ -278,10 +303,14 @@ class CooperativeRequestManagementController extends Controller
     }
 
     /**
-     * Reject a join request
+     * Reject a join request - PRIMARY ADMIN ONLY
      */
     public function rejectRequest(Request $request, $requestId)
     {
+        // NEW: Check primary admin access
+        $accessCheck = $this->checkPrimaryAdminAccess();
+        if ($accessCheck) return $accessCheck;
+
         $validator = Validator::make($request->all(), [
             'response_message' => 'required|string|max:500',
         ]);
@@ -296,10 +325,6 @@ class CooperativeRequestManagementController extends Controller
 
         /** @var User $currentUser */
         $currentUser = Auth::user();
-
-        if (!$currentUser->isCooperativeAdmin() || !$currentUser->cooperative) {
-            return response()->json(['success' => false, 'message' => 'Accès non autorisé'], 403);
-        }
 
         $joinRequest = CooperativeAdminRequest::with(['user'])
             ->where('id', $requestId)
@@ -339,7 +364,8 @@ class CooperativeRequestManagementController extends Controller
                 'request_id' => $requestId,
                 'rejected_by' => $currentUser->id,
                 'user_id' => $joinRequest->user->id,
-                'cooperative_id' => $currentUser->cooperative_id
+                'cooperative_id' => $currentUser->cooperative_id,
+                'rejected_by_primary_admin' => $currentUser->isPrimaryAdmin() // NEW: Log primary admin action
             ]);
 
             return response()->json([
@@ -363,10 +389,14 @@ class CooperativeRequestManagementController extends Controller
     }
 
     /**
-     * Send clarification request
+     * Send clarification request - PRIMARY ADMIN ONLY
      */
     public function requestClarification(Request $request, $requestId)
     {
+        // NEW: Check primary admin access
+        $accessCheck = $this->checkPrimaryAdminAccess();
+        if ($accessCheck) return $accessCheck;
+
         $validator = Validator::make($request->all(), [
             'message' => 'required|string|max:1000',
         ]);
@@ -381,10 +411,6 @@ class CooperativeRequestManagementController extends Controller
 
         /** @var User $currentUser */
         $currentUser = Auth::user();
-
-        if (!$currentUser->isCooperativeAdmin() || !$currentUser->cooperative) {
-            return response()->json(['success' => false, 'message' => 'Accès non autorisé'], 403);
-        }
 
         $joinRequest = CooperativeAdminRequest::with(['user'])
             ->where('id', $requestId)
@@ -417,7 +443,8 @@ class CooperativeRequestManagementController extends Controller
                 'request_id' => $requestId,
                 'requested_by' => $currentUser->id,
                 'user_id' => $joinRequest->user->id,
-                'cooperative_id' => $currentUser->cooperative_id
+                'cooperative_id' => $currentUser->cooperative_id,
+                'requested_by_primary_admin' => $currentUser->isPrimaryAdmin() // NEW: Log primary admin action
             ]);
 
             return response()->json([
@@ -440,10 +467,14 @@ class CooperativeRequestManagementController extends Controller
     }
 
     /**
-     * FIXED: Remove an admin from cooperative - Uses 'suspended' status
+     * Remove an admin from cooperative - PRIMARY ADMIN ONLY
      */
     public function removeAdmin(Request $request, $adminId)
     {
+        // NEW: Check primary admin access
+        $accessCheck = $this->checkPrimaryAdminAccess();
+        if ($accessCheck) return $accessCheck;
+
         $validator = Validator::make($request->all(), [
             'removal_reason' => 'nullable|string|max:500',
         ]);
@@ -459,15 +490,11 @@ class CooperativeRequestManagementController extends Controller
         /** @var User $currentUser */
         $currentUser = Auth::user();
 
-        if (!$currentUser->isCooperativeAdmin() || !$currentUser->cooperative) {
-            return response()->json(['success' => false, 'message' => 'Accès non autorisé'], 403);
-        }
-
         // Prevent self-removal
         if ($adminId == $currentUser->id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Vous ne pouvez pas vous retirer vous-même'
+                'message' => 'L\'administrateur principal ne peut pas se retirer lui-même'
             ], 400);
         }
 
@@ -481,10 +508,18 @@ class CooperativeRequestManagementController extends Controller
             return response()->json(['success' => false, 'message' => 'Administrateur introuvable'], 404);
         }
 
+        // NEW: Prevent removing primary admin
+        if ($adminToRemove->isPrimaryAdmin()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'L\'administrateur principal ne peut pas être retiré'
+            ], 400);
+        }
+
         try {
             // Prepare update data
             $updateData = [
-                'status' => 'suspended', // FIXED: Use 'suspended' not 'inactive'
+                'status' => 'suspended',
             ];
 
             // Only set removal tracking fields if columns exist
@@ -513,7 +548,8 @@ class CooperativeRequestManagementController extends Controller
                 'removed_admin_id' => $adminId,
                 'removed_by' => $currentUser->id,
                 'cooperative_id' => $currentUser->cooperative_id,
-                'removal_reason' => $request->removal_reason
+                'removal_reason' => $request->removal_reason,
+                'removed_by_primary_admin' => $currentUser->isPrimaryAdmin() // NEW: Log primary admin action
             ]);
 
             return response()->json([
@@ -536,10 +572,14 @@ class CooperativeRequestManagementController extends Controller
     }
 
     /**
-     * FIXED: Reactivate an admin
+     * Reactivate an admin - PRIMARY ADMIN ONLY
      */
     public function reactivateAdmin(Request $request, $adminId)
     {
+        // NEW: Check primary admin access
+        $accessCheck = $this->checkPrimaryAdminAccess();
+        if ($accessCheck) return $accessCheck;
+
         $validator = Validator::make($request->all(), [
             'reactivation_message' => 'nullable|string|max:500',
         ]);
@@ -554,10 +594,6 @@ class CooperativeRequestManagementController extends Controller
 
         /** @var User $currentUser */
         $currentUser = Auth::user();
-
-        if (!$currentUser->isCooperativeAdmin() || !$currentUser->cooperative) {
-            return response()->json(['success' => false, 'message' => 'Accès non autorisé'], 403);
-        }
 
         $adminToReactivate = User::where('id', $adminId)
             ->where('role', 'cooperative_admin')
@@ -600,7 +636,8 @@ class CooperativeRequestManagementController extends Controller
             Log::info('Admin reactivated', [
                 'reactivated_admin_id' => $adminId,
                 'reactivated_by' => $currentUser->id,
-                'cooperative_id' => $currentUser->cooperative_id
+                'cooperative_id' => $currentUser->cooperative_id,
+                'reactivated_by_primary_admin' => $currentUser->isPrimaryAdmin() // NEW: Log primary admin action
             ]);
 
             return response()->json([
@@ -623,16 +660,16 @@ class CooperativeRequestManagementController extends Controller
     }
 
     /**
-     * NEW: Permanently remove an admin
+     * Permanently remove an admin - PRIMARY ADMIN ONLY
      */
     public function permanentlyRemoveAdmin(Request $request, $adminId)
     {
+        // NEW: Check primary admin access
+        $accessCheck = $this->checkPrimaryAdminAccess();
+        if ($accessCheck) return $accessCheck;
+
         /** @var User $currentUser */
         $currentUser = Auth::user();
-
-        if (!$currentUser->isCooperativeAdmin() || !$currentUser->cooperative) {
-            return response()->json(['success' => false, 'message' => 'Accès non autorisé'], 403);
-        }
 
         $adminToDelete = User::where('id', $adminId)
             ->where('role', 'cooperative_admin')
@@ -641,6 +678,14 @@ class CooperativeRequestManagementController extends Controller
 
         if (!$adminToDelete) {
             return response()->json(['success' => false, 'message' => 'Administrateur introuvable'], 404);
+        }
+
+        // NEW: Prevent removing primary admin
+        if ($adminToDelete->isPrimaryAdmin()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'L\'administrateur principal ne peut pas être retiré définitivement'
+            ], 400);
         }
 
         try {
@@ -672,7 +717,8 @@ class CooperativeRequestManagementController extends Controller
             Log::info('Admin permanently removed', [
                 'removed_admin_id' => $adminId,
                 'removed_by' => $currentUser->id,
-                'cooperative_id' => $currentUser->cooperative_id
+                'cooperative_id' => $currentUser->cooperative_id,
+                'removed_by_primary_admin' => $currentUser->isPrimaryAdmin() // NEW: Log primary admin action
             ]);
 
             return response()->json([

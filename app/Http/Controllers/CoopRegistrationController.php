@@ -22,7 +22,7 @@ class CoopRegistrationController extends Controller
         return view('auth.coop-register');
     }
 
-    // ===== NEW: Search cooperatives for joining =====
+    // ===== Search cooperatives for joining =====
     public function searchCooperatives(Request $request)
     {
         $search = $request->get('search', '');
@@ -57,7 +57,7 @@ class CoopRegistrationController extends Controller
         ]);
     }
 
-    // ===== NEW: Get cooperative details =====
+    // ===== Get cooperative details =====
     public function getCooperativeDetails($id)
     {
         $cooperative = Cooperative::where('id', $id)
@@ -89,7 +89,7 @@ class CoopRegistrationController extends Controller
         ]);
     }
 
-    // ===== MODIFIED: Handle both new registration and join requests =====
+    // ===== Handle both new registration and join requests =====
     public function register(Request $request)
     {
         $registrationType = $request->input('registration_type', 'new');
@@ -101,7 +101,7 @@ class CoopRegistrationController extends Controller
         }
     }
 
-    // ===== NEW: Handle join existing cooperative request =====
+    // ===== Handle join existing cooperative request =====
     private function handleJoinRequest(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -174,8 +174,8 @@ class CoopRegistrationController extends Controller
                 throw new \Exception('Erreur lors de l\'envoi de l\'email de vérification.');
             }
 
-            // Send notification to existing cooperative admin
-            $existingAdmin = $cooperative->admin;
+            // Send notification to existing cooperative admin (primary admin)
+            $existingAdmin = $cooperative->primaryAdmin;
             if ($existingAdmin) {
                 EmailService::sendJoinRequestNotification(
                     $existingAdmin->email,
@@ -187,6 +187,14 @@ class CoopRegistrationController extends Controller
             }
 
             DB::commit();
+
+            Log::info('Join request created', [
+                'user_id' => $user->id,
+                'cooperative_id' => $cooperative->id,
+                'cooperative_name' => $cooperative->name,
+                'user_email' => $user->email,
+                'primary_admin_notified' => $existingAdmin ? $existingAdmin->id : null
+            ]);
 
             return redirect()->route('coop.verify-join-request', [
                 'email' => $user->email,
@@ -203,7 +211,7 @@ class CoopRegistrationController extends Controller
         }
     }
 
-    // ===== EXISTING: Handle new cooperative registration =====
+    // ===== Handle new cooperative registration =====
     private function handleNewCooperativeRegistration(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -257,6 +265,7 @@ class CoopRegistrationController extends Controller
                 'description' => $request->description,
                 'logo_path' => $logoPath,
                 'status' => 'pending',
+                // PRIMARY_ADMIN_ID will be set after user verification
             ]);
 
             // Create user
@@ -316,6 +325,14 @@ class CoopRegistrationController extends Controller
 
             DB::commit();
 
+            Log::info('New cooperative registration initiated', [
+                'cooperative_id' => $cooperative->id,
+                'cooperative_name' => $cooperative->name,
+                'user_id' => $user->id,
+                'user_email' => $user->email,
+                'will_be_primary_admin' => true
+            ]);
+
             return redirect()->route('coop.verify-emails', [
                 'user_email' => $user->email,
                 'coop_email' => $cooperative->email
@@ -335,7 +352,7 @@ class CoopRegistrationController extends Controller
         }
     }
 
-    // ===== NEW: Show join request verification form =====
+    // ===== Show join request verification form =====
     public function showVerifyJoinRequestForm(Request $request)
     {
         $email = $request->get('email');
@@ -343,7 +360,7 @@ class CoopRegistrationController extends Controller
         return view('auth.verify-join-request', compact('email', 'cooperativeName'));
     }
 
-    // ===== NEW: Verify join request email =====
+    // ===== Verify join request email =====
     public function verifyJoinRequest(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -376,10 +393,18 @@ class CoopRegistrationController extends Controller
             $user = User::find($verification->user_id);
             $user->markEmailAsVerified();
             // Note: Don't activate user yet - wait for admin approval
+            // Note: Don't set as primary admin - this is for join requests only
 
             $verification->update(['is_verified' => true]);
 
             DB::commit();
+
+            Log::info('Join request email verified', [
+                'user_id' => $user->id,
+                'user_email' => $user->email,
+                'cooperative_id' => $verification->cooperative_id,
+                'verification_id' => $verification->id
+            ]);
 
             return redirect()->route('coop.join-request-sent')
                             ->with('success', 'Email vérifié avec succès! Votre demande d\'adhésion est en attente d\'approbation.');
@@ -394,13 +419,13 @@ class CoopRegistrationController extends Controller
         }
     }
 
-    // ===== NEW: Show join request sent confirmation =====
+    // ===== Show join request sent confirmation =====
     public function showJoinRequestSent()
     {
         return view('auth.join-request-sent');
     }
 
-    // ===== EXISTING METHODS (unchanged) =====
+    // ===== Show email verification form for new cooperative =====
     public function showVerifyEmailsForm(Request $request)
     {
         $userEmail = $request->get('user_email');
@@ -408,6 +433,7 @@ class CoopRegistrationController extends Controller
         return view('auth.verify-coop-emails', compact('userEmail', 'coopEmail'));
     }
 
+    // ===== Verify emails for new cooperative registration =====
     public function verifyEmails(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -468,7 +494,26 @@ class CoopRegistrationController extends Controller
             // Update cooperative email verification
             $cooperative->update(['email_verified_at' => now()]);
 
+            // ===== NEW: Set the user as primary admin of the cooperative =====
+            if (!$cooperative->primary_admin_id) {
+                $cooperative->setPrimaryAdmin($user->id);
+                Log::info('Primary admin set for cooperative', [
+                    'cooperative_id' => $cooperative->id,
+                    'primary_admin_id' => $user->id,
+                    'admin_name' => $user->getFullNameAttribute(),
+                    'cooperative_name' => $cooperative->name
+                ]);
+            }
+
             DB::commit();
+
+            Log::info('Cooperative email verification completed', [
+                'cooperative_id' => $cooperative->id,
+                'cooperative_name' => $cooperative->name,
+                'user_id' => $user->id,
+                'user_email' => $user->email,
+                'primary_admin_set' => true
+            ]);
 
             return redirect()->route('login')
                             ->with('success', 'Emails vérifiés avec succès! Votre demande d\'inscription est en cours d\'examen par l\'administrateur. Vous recevrez une réponse sur l\'email de la coopérative.');

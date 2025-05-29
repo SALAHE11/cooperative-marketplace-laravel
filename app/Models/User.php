@@ -85,15 +85,35 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->role === 'client';
     }
 
+    // NEW: Check if user is primary admin of their cooperative
+    public function isPrimaryAdmin()
+    {
+        if (!$this->isCooperativeAdmin() || !$this->cooperative_id) {
+            return false;
+        }
+
+        return $this->cooperative && $this->cooperative->primary_admin_id === $this->id;
+    }
+
+    // NEW: Check if user can manage other admins (only primary admin can)
+    public function canManageAdmins()
+    {
+        return $this->isPrimaryAdmin();
+    }
+
     public function removedBy()
-{
-    return $this->belongsTo(User::class, 'removed_by');
-}
+    {
+        return $this->belongsTo(User::class, 'removed_by');
+    }
 
-public function cooperativeAdminRequests()
-{
-    return $this->hasMany(CooperativeAdminRequest::class);
-}
+    public function cooperativeAdminRequests()
+    {
+        return $this->hasMany(CooperativeAdminRequest::class);
+    }
 
-
+    // NEW: Cooperatives where this user is the primary admin
+    public function primaryCooperatives()
+    {
+        return $this->hasMany(Cooperative::class, 'primary_admin_id');
+    }
 }
