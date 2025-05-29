@@ -5,6 +5,7 @@ namespace App\Services;
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception;
+use Illuminate\Support\Facades\Log;
 
 class EmailService
 {
@@ -360,4 +361,91 @@ class EmailService
         return false;
     }
 }
+
+public static function sendJoinRequestNotification($adminEmail, $adminName, $requesterName, $cooperativeName, $message = '')
+{
+    $mail = new PHPMailer(true);
+
+    try {
+        // Server settings
+        $mail->isSMTP();
+        $mail->Host       = env('MAIL_HOST');
+        $mail->SMTPAuth   = true;
+        $mail->Username   = env('MAIL_USERNAME');
+        $mail->Password   = env('MAIL_PASSWORD');
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->Port       = env('MAIL_PORT');
+
+        $mail->CharSet = 'UTF-8';
+        $mail->Encoding = 'base64';
+
+        // Recipients
+        $mail->setFrom(env('MAIL_FROM_ADDRESS'), env('MAIL_FROM_NAME'));
+        $mail->addAddress($adminEmail, $adminName);
+
+        $messageHtml = $message ? "<p><strong>Message du candidat:</strong></p><blockquote style='border-left: 3px solid #007bff; padding-left: 15px; margin: 15px 0; font-style: italic;'>{$message}</blockquote>" : '';
+
+        // Content
+        $mail->isHTML(true);
+        $mail->Subject = 'Nouvelle demande d\'adhésion - ' . $cooperativeName;
+        $mail->Body    = "
+            <html>
+            <head>
+                <meta charset='UTF-8'>
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                    .header { background: linear-gradient(45deg, #28a745, #20c997); color: white; text-align: center; padding: 30px; border-radius: 10px 10px 0 0; }
+                    .content { padding: 30px; background: #f8f9fa; border-radius: 0 0 10px 10px; }
+                    .button { display: inline-block; padding: 15px 30px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0; }
+                    .footer { text-align: center; padding: 20px; color: #6c757d; }
+                    .info-box { background: #e3f2fd; border: 1px solid #2196f3; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                </style>
+            </head>
+            <body>
+                <div class='container'>
+                    <div class='header'>
+                        <h1>Nouvelle Demande d'Adhésion</h1>
+                        <p>{$cooperativeName}</p>
+                    </div>
+                    <div class='content'>
+                        <h2>Bonjour {$adminName},</h2>
+                        <p>Vous avez reçu une nouvelle demande d'adhésion pour votre coopérative <strong>{$cooperativeName}</strong>.</p>
+
+                        <div class='info-box'>
+                            <h3>Détails du candidat:</h3>
+                            <p><strong>Nom complet:</strong> {$requesterName}</p>
+                            <p><strong>Date de demande:</strong> " . now()->format('d/m/Y à H:i') . "</p>
+                        </div>
+
+                        {$messageHtml}
+
+                        <p>Pour examiner cette demande et prendre une décision, connectez-vous à votre tableau de bord administrateur de la coopérative.</p>
+
+                        <div style='text-align: center;'>
+                            <a href='" . url('/coop/dashboard') . "' class='button'>Voir les demandes d'adhésion</a>
+                        </div>
+
+                        <p><small><strong>Note:</strong> Cette demande nécessite votre approbation pour que le candidat puisse rejoindre votre équipe d'administration.</small></p>
+                    </div>
+                    <div class='footer'>
+                        <p>&copy; " . date('Y') . " Coopérative E-commerce. Tous droits réservés.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        ";
+
+        $mail->send();
+        return true;
+    } catch (Exception $e) {
+        Log::error('Join request notification email failed', [
+            'admin_email' => $adminEmail,
+            'error' => $e->getMessage()
+        ]);
+        return false;
+    }
+}
+
+
 }

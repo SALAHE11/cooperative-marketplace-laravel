@@ -100,4 +100,11 @@ Route::middleware(['auth', 'check.role:system_admin'])->prefix('admin')->name('a
     Route::post('/users/suspend-multiple', [App\Http\Controllers\Admin\UserManagementController::class, 'suspendMultiple'])->name('users.suspendMultiple');
 });
 
+// Cooperative search routes (for joining existing cooperative)
+Route::get('/cooperatives/search', [CoopRegistrationController::class, 'searchCooperatives'])->name('coop.search');
+Route::get('/cooperatives/{id}/details', [CoopRegistrationController::class, 'getCooperativeDetails'])->name('coop.details');
 
+// Join request routes
+Route::get('/verify-join-request', [CoopRegistrationController::class, 'showVerifyJoinRequestForm'])->name('coop.verify-join-request');
+Route::post('/verify-join-request', [CoopRegistrationController::class, 'verifyJoinRequest']);
+Route::get('/join-request-sent', [CoopRegistrationController::class, 'showJoinRequestSent'])->name('coop.join-request-sent');
