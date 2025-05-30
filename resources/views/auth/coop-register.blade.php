@@ -27,31 +27,65 @@
                         </div>
                     @endif
 
-                    <!-- Registration Type Selection -->
-                    <div class="card mb-4 bg-primary text-white">
-                        <div class="card-body">
-                            <h5 class="card-title mb-3">
+                    <!-- Registration Type Selection - UPDATED SECTION -->
+                    <div class="registration-type-selection mb-5">
+                        <div class="selection-header text-center mb-4">
+                            <h4 class="text-primary mb-2">
                                 <i class="fas fa-route me-2"></i>
                                 Choisissez votre type d'inscription
-                            </h5>
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="registration_type" id="newCoop" value="new" checked>
-                                        <label class="form-check-label" for="newCoop">
-                                            <strong>Créer une nouvelle coopérative</strong><br>
-                                            <small>Inscrivez votre coopérative sur la plateforme</small>
-                                        </label>
+                            </h4>
+                            <p class="text-muted">Sélectionnez l'option qui correspond le mieux à votre situation</p>
+                        </div>
+
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <div class="registration-type-card active" data-type="new">
+                                    <input type="radio" name="registration_type" id="newCoop" value="new" class="registration-type-radio" checked>
+                                    <div class="card-body p-4 text-center">
+                                        <div class="card-icon">
+                                            <i class="fas fa-plus"></i>
+                                        </div>
+                                        <h5>Créer une nouvelle coopérative</h5>
+                                        <p>Inscrivez votre coopérative sur la plateforme et devenez l'administrateur principal</p>
+
+                                        <ul class="feature-list text-start">
+                                            <li>Configuration complète de votre coopérative</li>
+                                            <li>Contrôle total de l'administration</li>
+                                            <li>Gestion des membres et produits</li>
+                                            <li>Outils de vente et marketing</li>
+                                        </ul>
                                     </div>
                                 </div>
-                                <div class="col-md-6 mb-3">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="registration_type" id="joinCoop" value="join">
-                                        <label class="form-check-label" for="joinCoop">
-                                            <strong>Rejoindre une coopérative existante</strong><br>
-                                            <small>Devenez administrateur d'une coopérative déjà inscrite</small>
-                                        </label>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="registration-type-card" data-type="join">
+                                    <input type="radio" name="registration_type" id="joinCoop" value="join" class="registration-type-radio">
+                                    <div class="card-body p-4 text-center">
+                                        <div class="card-icon">
+                                            <i class="fas fa-handshake"></i>
+                                        </div>
+                                        <h5>Rejoindre une coopérative existante</h5>
+                                        <p>Devenez administrateur d'une coopérative déjà inscrite sur la plateforme</p>
+
+                                        <ul class="feature-list text-start">
+                                            <li>Recherche parmi les coopératives actives</li>
+                                            <li>Demande d'adhésion simplifiée</li>
+                                            <li>Intégration rapide à l'équipe</li>
+                                            <li>Accès aux outils existants</li>
+                                        </ul>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Selected Option Indicator -->
+                        <div class="text-center mt-4">
+                            <div class="selected-option-indicator">
+                                <p class="text-muted mb-2 small">Option sélectionnée :</p>
+                                <div class="badge bg-primary px-3 py-2 fs-6" id="selectedOptionBadge">
+                                    <i class="fas fa-plus me-2"></i>
+                                    Créer une nouvelle coopérative
                                 </div>
                             </div>
                         </div>
@@ -488,6 +522,102 @@
 </div>
 
 <style>
+/* Registration Type Cards Styles */
+.registration-type-card {
+    border: 2px solid #e9ecef;
+    border-radius: 16px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    height: 100%;
+    background: white;
+}
+
+.registration-type-card:hover {
+    border-color: #007bff;
+    box-shadow: 0 8px 25px rgba(0, 123, 255, 0.15);
+    transform: translateY(-2px);
+}
+
+.registration-type-card.active {
+    border-color: #007bff;
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    color: white;
+    box-shadow: 0 12px 35px rgba(0, 123, 255, 0.25);
+}
+
+.registration-type-card.active .card-icon {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.registration-type-card .card-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem auto;
+    font-size: 2rem;
+    color: #007bff;
+    transition: all 0.3s ease;
+}
+
+.registration-type-radio {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 20px;
+    height: 20px;
+    accent-color: #007bff;
+}
+
+.registration-type-card h5 {
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+}
+
+.registration-type-card p {
+    margin-bottom: 1rem;
+    opacity: 0.8;
+    line-height: 1.5;
+}
+
+.registration-type-card.active p {
+    opacity: 0.9;
+}
+
+.feature-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.feature-list li {
+    padding: 0.25rem 0;
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+.feature-list li:before {
+    content: "✓";
+    color: #28a745;
+    font-weight: bold;
+    margin-right: 0.5rem;
+}
+
+.registration-type-card.active .feature-list li:before {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.selection-header h4 {
+    font-weight: 600;
+}
+
+/* Existing styles */
 .logo-preview {
     width: 120px;
     height: 120px;
@@ -583,6 +713,22 @@
     color: #0d6efd;
     font-weight: 500;
 }
+
+@media (max-width: 768px) {
+    .registration-type-card {
+        margin-bottom: 1.5rem;
+    }
+
+    .card-icon {
+        width: 60px !important;
+        height: 60px !important;
+        font-size: 1.5rem !important;
+    }
+
+    .feature-list {
+        font-size: 0.85rem;
+    }
+}
 </style>
 @endsection
 
@@ -592,6 +738,60 @@
         let searchTimeout;
         let selectedCooperativeData = null;
         const cooperativeModal = new bootstrap.Modal(document.getElementById('cooperativeModal'));
+
+        // Registration type card functionality
+        const cards = document.querySelectorAll('.registration-type-card');
+        const radios = document.querySelectorAll('.registration-type-radio');
+        const selectedBadge = document.getElementById('selectedOptionBadge');
+
+        // Card click handlers
+        cards.forEach(card => {
+            card.addEventListener('click', function() {
+                const type = this.dataset.type;
+                const radio = this.querySelector('.registration-type-radio');
+
+                // Update radio selection
+                radios.forEach(r => r.checked = false);
+                radio.checked = true;
+
+                // Update visual state
+                updateCardStates();
+                updateSelectedBadge(type);
+
+                // Trigger the existing toggle functionality
+                toggleRegistrationType();
+            });
+        });
+
+        // Radio change handlers
+        radios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                if (this.checked) {
+                    updateCardStates();
+                    updateSelectedBadge(this.value);
+                    toggleRegistrationType();
+                }
+            });
+        });
+
+        function updateCardStates() {
+            cards.forEach(card => {
+                const radio = card.querySelector('.registration-type-radio');
+                if (radio.checked) {
+                    card.classList.add('active');
+                } else {
+                    card.classList.remove('active');
+                }
+            });
+        }
+
+        function updateSelectedBadge(type) {
+            if (type === 'new') {
+                selectedBadge.innerHTML = '<i class="fas fa-plus me-2"></i>Créer une nouvelle coopérative';
+            } else {
+                selectedBadge.innerHTML = '<i class="fas fa-handshake me-2"></i>Rejoindre une coopérative existante';
+            }
+        }
 
         // Toggle registration type
         const newCoopRadio = document.getElementById('newCoop');
@@ -630,8 +830,9 @@
             input.setAttribute('data-required', 'true');
         });
 
-        newCoopRadio.addEventListener('change', toggleRegistrationType);
-        joinCoopRadio.addEventListener('change', toggleRegistrationType);
+        // Initialize card states
+        updateCardStates();
+        toggleRegistrationType();
 
         // Cooperative search functionality
         const coopSearch = document.getElementById('coopSearch');
