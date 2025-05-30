@@ -27,7 +27,7 @@
                         </div>
                     @endif
 
-                    <!-- Registration Type Selection - UPDATED SECTION -->
+                    <!-- Registration Type Selection -->
                     <div class="registration-type-selection mb-5">
                         <div class="selection-header text-center mb-4">
                             <h4 class="text-primary mb-2">
@@ -211,7 +211,49 @@
                                     </h4>
                                 </div>
 
-                                <div class="col-12 mb-3">
+                                <!-- Selected Cooperative Display - MOVED TO TOP AND IMPROVED -->
+                                <div class="col-12 mb-4">
+                                    <div id="selectedCooperative" class="selected-cooperative-display" style="display: none;">
+                                        <div class="card border-success">
+                                            <div class="card-header bg-success text-white">
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <i class="fas fa-check-circle me-2"></i>
+                                                        <strong>Coopérative Sélectionnée</strong>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm btn-outline-light" id="clearSelection">
+                                                        <i class="fas fa-times me-1"></i> Changer
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="card-body bg-light">
+                                                <div class="row align-items-center">
+                                                    <div class="col-auto">
+                                                        <div class="selected-coop-logo">
+                                                            <i class="fas fa-building fa-2x text-success"></i>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col">
+                                                        <h5 class="mb-1 text-success" id="selectedCoopName"></h5>
+                                                        <p class="mb-0 text-muted small">
+                                                            <i class="fas fa-info-circle me-1"></i>
+                                                            Vous pouvez maintenant compléter votre demande d'adhésion ci-dessous
+                                                        </p>
+                                                    </div>
+                                                    <div class="col-auto">
+                                                        <div class="badge bg-success px-3 py-2">
+                                                            <i class="fas fa-check me-1"></i>
+                                                            Confirmé
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <input type="hidden" name="cooperative_id" id="cooperativeId">
+                                    </div>
+                                </div>
+
+                                <div class="col-12 mb-3" id="searchSection">
                                     <label for="coopSearch" class="form-label">
                                         <i class="fas fa-building me-1"></i>
                                         Rechercher par nom, secteur ou localisation
@@ -245,24 +287,6 @@
                                                 <div id="cooperativesList"></div>
                                             </div>
                                         </div>
-                                    </div>
-                                </div>
-
-                                <!-- Selected Cooperative -->
-                                <div class="col-12">
-                                    <div id="selectedCooperative" style="display: none;">
-                                        <div class="alert alert-success">
-                                            <div class="d-flex justify-content-between align-items-center">
-                                                <div>
-                                                    <strong>Coopérative sélectionnée:</strong>
-                                                    <span id="selectedCoopName"></span>
-                                                </div>
-                                                <button type="button" class="btn btn-sm btn-outline-danger" id="clearSelection">
-                                                    <i class="fas fa-times"></i> Changer
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <input type="hidden" name="cooperative_id" id="cooperativeId">
                                     </div>
                                 </div>
 
@@ -513,10 +537,25 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
                 <button type="button" class="btn btn-success" id="selectCooperativeBtn">
-                    <i class="fas fa-check me-1"></i>
-                    Sélectionner cette coopérative
+                    <span id="selectBtnLoading" class="spinner-border spinner-border-sm me-2" style="display: none;"></span>
+                    <i class="fas fa-check me-1" id="selectBtnIcon"></i>
+                    <span id="selectBtnText">Sélectionner cette coopérative</span>
                 </button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Success Toast -->
+<div class="toast-container position-fixed top-0 end-0 p-3">
+    <div id="successToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header bg-success text-white">
+            <i class="fas fa-check-circle me-2"></i>
+            <strong class="me-auto">Succès</strong>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body">
+            Coopérative sélectionnée avec succès!
         </div>
     </div>
 </div>
@@ -617,7 +656,34 @@
     font-weight: 600;
 }
 
-/* Existing styles */
+/* Selected Cooperative Display Styles */
+.selected-cooperative-display {
+    animation: slideInFromTop 0.5s ease;
+}
+
+@keyframes slideInFromTop {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.selected-coop-logo {
+    width: 60px;
+    height: 60px;
+    background: rgba(40, 167, 69, 0.1);
+    border: 2px solid #28a745;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Logo Preview Styles */
 .logo-preview {
     width: 120px;
     height: 120px;
@@ -669,6 +735,7 @@
     display: block;
 }
 
+/* Search Results Styles */
 .search-results {
     max-height: 400px;
     overflow-y: auto;
@@ -678,11 +745,12 @@
     border-bottom: 1px solid #eee;
     padding: 15px;
     cursor: pointer;
-    transition: background-color 0.2s;
+    transition: all 0.2s ease;
 }
 
 .cooperative-item:hover {
     background-color: #f8f9fa;
+    border-left: 4px solid #007bff;
 }
 
 .cooperative-item:last-child {
@@ -707,11 +775,24 @@
     align-items: center;
     justify-content: center;
     color: #6c757d;
+    transition: all 0.2s ease;
+}
+
+.cooperative-item:hover .cooperative-logo-placeholder {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
 }
 
 .form-check-input:checked ~ .form-check-label {
     color: #0d6efd;
     font-weight: 500;
+}
+
+/* Modal Enhancements */
+.modal-content {
+    border: none;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 }
 
 @media (max-width: 768px) {
@@ -728,6 +809,11 @@
     .feature-list {
         font-size: 0.85rem;
     }
+
+    .selected-coop-logo {
+        width: 50px;
+        height: 50px;
+    }
 }
 </style>
 @endsection
@@ -738,6 +824,7 @@
         let searchTimeout;
         let selectedCooperativeData = null;
         const cooperativeModal = new bootstrap.Modal(document.getElementById('cooperativeModal'));
+        const successToast = new bootstrap.Toast(document.getElementById('successToast'));
 
         // Registration type card functionality
         const cards = document.querySelectorAll('.registration-type-card');
@@ -882,7 +969,8 @@
                         </div>
                         <div class="col-auto">
                             <button type="button" class="btn btn-outline-primary btn-sm view-details" data-coop-id="${coop.id}">
-                                <i class="fas fa-eye"></i>
+                                <i class="fas fa-eye me-1"></i>
+                                Voir détails
                             </button>
                         </div>
                     </div>
@@ -954,28 +1042,92 @@
             `;
         }
 
-        // Select cooperative
+        // Select cooperative - IMPROVED VERSION
         document.getElementById('selectCooperativeBtn').addEventListener('click', function() {
             if (selectedCooperativeData) {
-                selectCooperative(selectedCooperativeData);
-                cooperativeModal.hide();
+                // Show loading state
+                showSelectButtonLoading(true);
+
+                // Simulate brief delay for better UX
+                setTimeout(() => {
+                    selectCooperative(selectedCooperativeData);
+                    cooperativeModal.hide();
+
+                    // Reset button state
+                    showSelectButtonLoading(false);
+
+                    // Show success toast
+                    successToast.show();
+                }, 500);
             }
         });
 
-        function selectCooperative(coop) {
-            document.getElementById('cooperativeId').value = coop.id;
-            document.getElementById('selectedCoopName').textContent = coop.name;
-            document.getElementById('selectedCooperative').style.display = 'block';
-            document.getElementById('joinMessage').style.display = 'block';
-            searchResults.style.display = 'none';
-            coopSearch.value = '';
+        function showSelectButtonLoading(loading) {
+            const loadingSpinner = document.getElementById('selectBtnLoading');
+            const icon = document.getElementById('selectBtnIcon');
+            const text = document.getElementById('selectBtnText');
+            const button = document.getElementById('selectCooperativeBtn');
+
+            if (loading) {
+                loadingSpinner.style.display = 'inline-block';
+                icon.style.display = 'none';
+                text.textContent = 'Sélection en cours...';
+                button.disabled = true;
+            } else {
+                loadingSpinner.style.display = 'none';
+                icon.style.display = 'inline';
+                text.textContent = 'Sélectionner cette coopérative';
+                button.disabled = false;
+            }
         }
 
-        // Clear selection
+        function selectCooperative(coop) {
+            // Set form values
+            document.getElementById('cooperativeId').value = coop.id;
+            document.getElementById('selectedCoopName').textContent = coop.name;
+
+            // Show selected cooperative display with animation
+            const selectedCoopElement = document.getElementById('selectedCooperative');
+            selectedCoopElement.style.display = 'block';
+
+            // Show message section
+            document.getElementById('joinMessage').style.display = 'block';
+
+            // Hide search results
+            searchResults.style.display = 'none';
+
+            // Clear search input
+            coopSearch.value = '';
+
+            // Scroll to selected cooperative display for better visibility
+            setTimeout(() => {
+                selectedCoopElement.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start',
+                    inline: 'nearest'
+                });
+            }, 100);
+        }
+
+        // Clear selection - IMPROVED VERSION
         document.getElementById('clearSelection').addEventListener('click', function() {
+            // Hide selected cooperative display
             document.getElementById('selectedCooperative').style.display = 'none';
             document.getElementById('joinMessage').style.display = 'none';
+
+            // Clear form values
+            document.getElementById('cooperativeId').value = '';
+
+            // Reset selected cooperative data
             selectedCooperativeData = null;
+
+            // Focus on search input for better UX
+            coopSearch.focus();
+
+            // Show search results if there were any
+            if (cooperativesList.children.length > 0) {
+                searchResults.style.display = 'block';
+            }
         });
 
         // Search events
@@ -997,10 +1149,14 @@
             }
         });
 
-        // Load initial cooperatives
-        if (joinCoopRadio.checked) {
-            searchCooperatives();
-        }
+        // Load initial cooperatives when switching to join mode
+        const originalToggleRegistrationType = toggleRegistrationType;
+        toggleRegistrationType = function() {
+            originalToggleRegistrationType();
+            if (joinCoopRadio.checked && cooperativesList.children.length === 0) {
+                searchCooperatives();
+            }
+        };
 
         // Toggle password visibility
         function setupPasswordToggle(toggleId, inputId) {
