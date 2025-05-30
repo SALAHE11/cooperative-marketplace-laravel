@@ -263,6 +263,34 @@
         </div>
     </div>
 </div>
+
+<!-- Image Gallery Modal -->
+<div class="modal fade" id="imageGalleryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="imageGalleryModalLabel">
+                    <i class="fas fa-images me-2"></i>
+                    Images du Produit
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0" id="imageGalleryBody">
+                <!-- Gallery content will be populated here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i>
+                    Fermer
+                </button>
+                <button type="button" class="btn btn-primary" onclick="downloadCurrentImage()">
+                    <i class="fas fa-download me-1"></i>
+                    Télécharger l'image
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('styles')
@@ -314,35 +342,122 @@
     color: #007bff;
 }
 
-.image-gallery {
-    max-height: 400px;
-    overflow-y: auto;
+/* Image Gallery Styling */
+.image-gallery-container {
+    display: flex;
+    flex-direction: column;
+    height: 70vh;
 }
 
-.gallery-image {
+.main-image-container {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+    overflow: hidden;
+}
+
+.main-gallery-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    transition: all 0.3s ease;
+}
+
+.image-navigation {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
     width: 100%;
-    height: 150px;
-    object-fit: cover;
-    border-radius: 0.375rem;
-    margin-bottom: 10px;
-    cursor: pointer;
-    transition: transform 0.2s;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 1rem;
+    pointer-events: none;
 }
 
-.gallery-image:hover {
+.nav-btn {
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    pointer-events: all;
+}
+
+.nav-btn:hover {
+    background: rgba(0, 0, 0, 0.9);
+    transform: scale(1.1);
+}
+
+.image-counter {
+    position: absolute;
+    bottom: 1rem;
+    right: 1rem;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 1rem;
+    font-weight: 500;
+}
+
+.thumbnail-strip {
+    display: flex;
+    overflow-x: auto;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+    gap: 0.5rem;
+}
+
+.thumbnail-item {
+    position: relative;
+    flex-shrink: 0;
+    width: 80px;
+    height: 80px;
+    border: 2px solid transparent;
+    border-radius: 0.375rem;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.thumbnail-item:hover {
+    border-color: #007bff;
     transform: scale(1.05);
 }
 
-.primary-image-badge {
+.thumbnail-item.active {
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.3);
+}
+
+.thumbnail-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.primary-badge {
     position: absolute;
-    top: 5px;
-    left: 5px;
-    background: rgba(40, 167, 69, 0.9);
-    color: white;
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.75rem;
+    top: 2px;
+    left: 2px;
+    background: rgba(255, 193, 7, 0.9);
+    color: #212529;
+    font-size: 0.65rem;
+    padding: 0.1rem 0.3rem;
+    border-radius: 0.2rem;
     font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
 }
 </style>
 @endpush
@@ -353,10 +468,16 @@ let currentProductId = null;
 let currentAction = null;
 let productDetailsModal = null;
 let responseModal = null;
+let imageGalleryModal = null;
+
+// Image gallery variables
+let currentImageIndex = 0;
+let galleryImages = [];
 
 document.addEventListener('DOMContentLoaded', function() {
     productDetailsModal = new bootstrap.Modal(document.getElementById('productDetailsModal'));
     responseModal = new bootstrap.Modal(document.getElementById('responseModal'));
+    imageGalleryModal = new bootstrap.Modal(document.getElementById('imageGalleryModal'));
 
     // Response form submission
     document.getElementById('sendResponseBtn').addEventListener('click', function() {
@@ -382,7 +503,6 @@ function showProductDetails(productId) {
     fetch(`/admin/product-requests/${productId}`)
         .then(response => response.text())
         .then(html => {
-            // The response should contain the full product details HTML
             document.getElementById('productDetailsContent').innerHTML = html;
             setupModalActions(productId);
         })
@@ -399,8 +519,6 @@ function showProductDetails(productId) {
 
 function setupModalActions(productId) {
     const actionsContainer = document.getElementById('productModalActions');
-
-    // Get product status from the loaded content
     const statusElement = document.querySelector('#productDetailsContent .product-status');
     const status = statusElement ? statusElement.dataset.status : null;
 
@@ -426,6 +544,130 @@ function setupModalActions(productId) {
     actionsContainer.innerHTML = actionsHtml;
 }
 
+// Image Gallery Functions
+function openImageGallery() {
+    const imagesDataElement = document.getElementById('productImagesData');
+    if (!imagesDataElement) {
+        showAlert('Aucune donnée d\'image trouvée', 'danger');
+        return;
+    }
+
+    const data = JSON.parse(imagesDataElement.textContent);
+    galleryImages = data.images;
+
+    if (galleryImages.length === 0) {
+        showAlert('Aucune image disponible pour ce produit', 'warning');
+        return;
+    }
+
+    document.getElementById('imageGalleryModalLabel').innerHTML = `
+        <i class="fas fa-images me-2"></i>
+        Images du Produit - ${data.productName}
+    `;
+
+    createImageGallery();
+    imageGalleryModal.show();
+}
+
+function createImageGallery() {
+    const galleryBody = document.getElementById('imageGalleryBody');
+
+    if (galleryImages.length === 0) {
+        galleryBody.innerHTML = `
+            <div class="text-center py-5">
+                <i class="fas fa-image fa-4x text-muted mb-3"></i>
+                <h5 class="text-muted">Aucune image disponible</h5>
+                <p class="text-muted">Ce produit n'a pas d'images associées.</p>
+            </div>
+        `;
+        return;
+    }
+
+    currentImageIndex = 0;
+
+    const galleryHtml = `
+        <div class="image-gallery-container">
+            <!-- Main Image Display -->
+            <div class="main-image-container">
+                <img id="mainGalleryImage"
+                     src="${galleryImages[0].url}"
+                     alt="Image principale du produit"
+                     class="main-gallery-image">
+                <div class="image-navigation">
+                    <button type="button" class="nav-btn nav-prev" onclick="previousImage()">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <button type="button" class="nav-btn nav-next" onclick="nextImage()">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+                <div class="image-counter">
+                    <span id="currentImageIndex">1</span> / ${galleryImages.length}
+                </div>
+            </div>
+
+            <!-- Thumbnail Strip -->
+            <div class="thumbnail-strip">
+                ${galleryImages.map((image, index) => `
+                    <div class="thumbnail-item ${index === 0 ? 'active' : ''}"
+                         onclick="selectImage(${index}, '${image.url}')"
+                         data-index="${index}">
+                        <img src="${image.thumbnail}"
+                             alt="Miniature ${index + 1}"
+                             class="thumbnail-image">
+                        ${image.isPrimary ? `
+                            <div class="primary-badge">
+                                <i class="fas fa-star"></i>
+                                Principal
+                            </div>
+                        ` : ''}
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+
+    galleryBody.innerHTML = galleryHtml;
+}
+
+function selectImage(index, imageUrl) {
+    currentImageIndex = index;
+
+    // Update main image
+    document.getElementById('mainGalleryImage').src = imageUrl;
+
+    // Update counter
+    document.getElementById('currentImageIndex').textContent = index + 1;
+
+    // Update active thumbnail
+    document.querySelectorAll('.thumbnail-item').forEach((item, i) => {
+        item.classList.toggle('active', i === index);
+    });
+}
+
+function previousImage() {
+    if (galleryImages.length === 0) return;
+
+    currentImageIndex = (currentImageIndex - 1 + galleryImages.length) % galleryImages.length;
+    selectImage(currentImageIndex, galleryImages[currentImageIndex].url);
+}
+
+function nextImage() {
+    if (galleryImages.length === 0) return;
+
+    currentImageIndex = (currentImageIndex + 1) % galleryImages.length;
+    selectImage(currentImageIndex, galleryImages[currentImageIndex].url);
+}
+
+function downloadCurrentImage() {
+    if (galleryImages.length === 0) return;
+
+    const link = document.createElement('a');
+    link.href = galleryImages[currentImageIndex].url;
+    link.download = `product-image-${currentImageIndex + 1}.jpg`;
+    link.click();
+}
+
 function showResponseModal(action, title, label, required) {
     currentAction = action;
 
@@ -442,7 +684,6 @@ function showResponseModal(action, title, label, required) {
         document.getElementById('responseMessageHelp').textContent = 'Ce message sera envoyé par email à la coopérative.';
     }
 
-    // Update button text
     const buttonTexts = {
         'approve': 'Approuver',
         'reject': 'Rejeter',
@@ -513,32 +754,6 @@ function handleResponseSubmission() {
     });
 }
 
-function showImageModal(imageUrl) {
-    const modal = document.createElement('div');
-    modal.className = 'modal fade';
-    modal.innerHTML = `
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Image du Produit</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body text-center">
-                    <img src="${imageUrl}" class="img-fluid" style="max-height: 70vh;">
-                </div>
-            </div>
-        </div>
-    `;
-
-    document.body.appendChild(modal);
-    const imageModal = new bootstrap.Modal(modal);
-    imageModal.show();
-
-    modal.addEventListener('hidden.bs.modal', function() {
-        document.body.removeChild(modal);
-    });
-}
-
 function showLoading(button) {
     button.disabled = true;
     const spinner = button.querySelector('.spinner-border');
@@ -574,5 +789,19 @@ function showAlert(message, type) {
         }
     }, 5000);
 }
+
+// Keyboard navigation for image gallery
+document.addEventListener('keydown', function(e) {
+    const modal = document.getElementById('imageGalleryModal');
+    if (modal.classList.contains('show')) {
+        if (e.key === 'ArrowLeft') {
+            previousImage();
+        } else if (e.key === 'ArrowRight') {
+            nextImage();
+        } else if (e.key === 'Escape') {
+            imageGalleryModal.hide();
+        }
+    }
+});
 </script>
 @endpush

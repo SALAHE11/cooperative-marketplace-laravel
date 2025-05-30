@@ -175,6 +175,7 @@ Route::middleware(['auth', 'check.role:cooperative_admin'])->prefix('coop')->nam
     Route::put('/products/{product}', [ProductManagementController::class, 'update'])->name('products.update');
     Route::post('/products/{product}/submit', [ProductManagementController::class, 'submit'])->name('products.submit');
     Route::delete('/products/{product}', [ProductManagementController::class, 'destroy'])->name('products.destroy');
+    Route::get('/products/{product}', [ProductManagementController::class, 'show'])->name('products.show');
 });
 
 // ===== CLIENT ROUTES =====

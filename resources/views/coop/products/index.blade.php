@@ -168,6 +168,12 @@
 
                                             <!-- Action Buttons -->
                                             <div class="product-actions mt-auto">
+                                                <a href="{{ route('coop.products.show', $product) }}"
+                                                   class="btn btn-outline-primary btn-sm">
+                                                    <i class="fas fa-eye me-1"></i>
+                                                    Détails
+                                                </a>
+
                                                 @if($product->canBeEdited())
                                                     <a href="{{ route('coop.products.edit', $product) }}"
                                                        class="btn btn-primary btn-sm">

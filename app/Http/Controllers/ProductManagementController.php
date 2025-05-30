@@ -534,4 +534,18 @@ class ProductManagementController extends Controller
             </div>
         ";
     }
+
+    public function show(Product $product)
+{
+    $user = Auth::user();
+
+    // Check if the product belongs to the user's cooperative
+    if ($product->cooperative_id !== $user->cooperative_id) {
+        abort(403, 'Accès non autorisé à ce produit.');
+    }
+
+    $product->load(['category', 'images', 'cooperative', 'reviewedBy']);
+
+    return view('coop.products.show', compact('product'));
+}
 }
