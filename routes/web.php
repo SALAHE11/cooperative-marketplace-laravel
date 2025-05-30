@@ -11,6 +11,8 @@ use App\Http\Controllers\Admin\CooperativeManagementController;
 use App\Http\Controllers\Admin\AdminInvitationController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Auth\PasswordResetController;
+use App\Http\Controllers\ProductManagementController;
+use App\Http\Controllers\Admin\ProductRequestManagementController;
 
 /*
 |--------------------------------------------------------------------------
@@ -134,6 +136,14 @@ Route::middleware(['auth', 'check.role:system_admin'])->prefix('admin')->name('a
     Route::patch('/users/{user}/status', [UserManagementController::class, 'updateStatus'])->name('users.updateStatus');
     Route::post('/users/activate-all-pending', [UserManagementController::class, 'activateAllPending'])->name('users.activateAllPending');
     Route::post('/users/suspend-multiple', [UserManagementController::class, 'suspendMultiple'])->name('users.suspendMultiple');
+
+    // Product request management routes
+    Route::get('/product-requests', [ProductRequestManagementController::class, 'index'])->name('product-requests.index');
+    Route::get('/product-requests/{product}', [ProductRequestManagementController::class, 'show'])->name('product-requests.show');
+    Route::post('/product-requests/{product}/approve', [ProductRequestManagementController::class, 'approve'])->name('product-requests.approve');
+    Route::post('/product-requests/{product}/reject', [ProductRequestManagementController::class, 'reject'])->name('product-requests.reject');
+    Route::post('/product-requests/{product}/request-info', [ProductRequestManagementController::class, 'requestInfo'])->name('product-requests.request-info');
+    Route::get('/product-requests/{product}/images', [ProductRequestManagementController::class, 'getImages'])->name('product-requests.images');
 });
 
 // ===== COOPERATIVE ADMIN ROUTES =====
@@ -157,8 +167,14 @@ Route::middleware(['auth', 'check.role:cooperative_admin'])->prefix('coop')->nam
     Route::post('/admins/{admin}/reactivate', [CooperativeRequestManagementController::class, 'reactivateAdmin'])->name('admins.reactivate');
     Route::delete('/admins/{admin}/permanently-remove', [CooperativeRequestManagementController::class, 'permanentlyRemoveAdmin'])->name('admins.permanently-remove');
 
-    // Additional cooperative admin routes can be added here
-    // Example: Product management, order management, etc.
+    // Product management routes
+    Route::get('/products', [ProductManagementController::class, 'index'])->name('products.index');
+    Route::get('/products/create', [ProductManagementController::class, 'create'])->name('products.create');
+    Route::post('/products', [ProductManagementController::class, 'store'])->name('products.store');
+    Route::get('/products/{product}/edit', [ProductManagementController::class, 'edit'])->name('products.edit');
+    Route::put('/products/{product}', [ProductManagementController::class, 'update'])->name('products.update');
+    Route::post('/products/{product}/submit', [ProductManagementController::class, 'submit'])->name('products.submit');
+    Route::delete('/products/{product}', [ProductManagementController::class, 'destroy'])->name('products.destroy');
 });
 
 // ===== CLIENT ROUTES =====

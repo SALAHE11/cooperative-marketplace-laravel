@@ -21,7 +21,8 @@
 
     <!-- Stats Cards -->
     <div class="row mb-4">
-        <div class="col-xl-3 col-md-6 mb-4">
+        <!-- Cooperatives Stats -->
+        <div class="col-xl-2 col-md-4 mb-4">
             <div class="card border-left-primary shadow h-100 py-2">
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
@@ -41,7 +42,8 @@
             </div>
         </div>
 
-        <div class="col-xl-3 col-md-6 mb-4">
+        <!-- Users Stats -->
+        <div class="col-xl-2 col-md-4 mb-4">
             <div class="card border-left-success shadow h-100 py-2">
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
@@ -61,13 +63,14 @@
             </div>
         </div>
 
-        <div class="col-xl-3 col-md-6 mb-4">
+        <!-- Pending Cooperatives -->
+        <div class="col-xl-2 col-md-4 mb-4">
             <div class="card border-left-info shadow h-100 py-2">
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
-                                Demandes en Attente
+                                Demandes Coopératives
                             </div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
                                 {{ \App\Models\Cooperative::where('status', 'pending')->count() }}
@@ -81,12 +84,65 @@
             </div>
         </div>
 
-        <div class="col-xl-3 col-md-6 mb-4">
+        <!-- Product Stats -->
+        @php
+            $productStats = [
+                'total' => \App\Models\Product::whereIn('status', ['pending', 'approved', 'rejected', 'needs_info'])->count(),
+                'pending' => \App\Models\Product::where('status', 'pending')->count(),
+                'approved' => \App\Models\Product::where('status', 'approved')->count(),
+                'rejected_or_info' => \App\Models\Product::whereIn('status', ['rejected', 'needs_info'])->count()
+            ];
+        @endphp
+
+        <!-- Pending Products -->
+        <div class="col-xl-2 col-md-4 mb-4">
             <div class="card border-left-warning shadow h-100 py-2">
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Produits en Attente
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ $productStats['pending'] }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-box fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Approved Products -->
+        <div class="col-xl-2 col-md-4 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Produits Approuvés
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ $productStats['approved'] }}
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Categories -->
+        <div class="col-xl-2 col-md-4 mb-4">
+            <div class="card border-left-dark shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-dark text-uppercase mb-1">
                                 Catégories Totales
                             </div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">
@@ -104,11 +160,81 @@
 
     <!-- Content Row -->
     <div class="row">
-        <!-- Pending Cooperatives -->
+        <!-- Pending Product Requests -->
         <div class="col-lg-8 mb-4">
             <div class="card shadow">
                 <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-primary">Demandes d'Inscription en Attente</h6>
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-box-open me-2"></i>
+                        Demandes de Produits en Attente
+                    </h6>
+                    <a href="{{ route('admin.product-requests.index') }}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-list me-1"></i>
+                        Gérer toutes
+                    </a>
+                </div>
+                <div class="card-body">
+                    @php
+                        $pendingProducts = \App\Models\Product::with(['cooperative', 'category', 'images'])
+                            ->where('status', 'pending')
+                            ->latest('submitted_at')
+                            ->take(5)
+                            ->get();
+                    @endphp
+
+                    @if($pendingProducts->count() > 0)
+                        <div class="row">
+                            @foreach($pendingProducts as $product)
+                                <div class="col-md-6 col-lg-4 mb-3">
+                                    <div class="card product-preview-card h-100" onclick="viewProductRequest({{ $product->id }})">
+                                        <div class="position-relative">
+                                            @if($product->primaryImageUrl)
+                                                <img src="{{ $product->primaryImageUrl }}"
+                                                     class="card-img-top product-preview-image"
+                                                     alt="{{ $product->name }}">
+                                            @else
+                                                <div class="card-img-top product-preview-image bg-light d-flex align-items-center justify-content-center">
+                                                    <i class="fas fa-image fa-2x text-muted"></i>
+                                                </div>
+                                            @endif
+                                            <span class="position-absolute top-0 end-0 m-2 badge bg-warning">En attente</span>
+                                        </div>
+                                        <div class="card-body p-3">
+                                            <h6 class="card-title mb-2">{{ Str::limit($product->name, 30) }}</h6>
+                                            <p class="card-text small text-muted mb-2">
+                                                <i class="fas fa-building me-1"></i>
+                                                {{ $product->cooperative->name }}
+                                            </p>
+                                            <p class="card-text small text-muted mb-2">
+                                                <i class="fas fa-tag me-1"></i>
+                                                {{ $product->category->name }}
+                                            </p>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <span class="fw-bold text-success">{{ number_format($product->price, 2) }} MAD</span>
+                                                <small class="text-muted">{{ $product->submitted_at->format('d/m') }}</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @else
+                        <div class="text-center py-4">
+                            <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                            <h5>Aucune demande en attente</h5>
+                            <p class="text-muted">Toutes les demandes de produits ont été traitées.</p>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            <!-- Pending Cooperatives -->
+            <div class="card shadow mt-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        <i class="fas fa-building me-2"></i>
+                        Demandes de Coopératives en Attente
+                    </h6>
                     <a href="{{ route('admin.cooperatives.index') }}" class="btn btn-primary btn-sm">
                         <i class="fas fa-list me-1"></i>
                         Gérer toutes
@@ -176,7 +302,7 @@
                         <div class="text-center py-4">
                             <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
                             <h5>Aucune demande en attente</h5>
-                            <p class="text-muted">Toutes les demandes ont été traitées.</p>
+                            <p class="text-muted">Toutes les demandes de coopératives ont été traitées.</p>
                         </div>
                     @endif
                 </div>
@@ -196,15 +322,22 @@
                                 <i class="fas fa-building text-primary me-3"></i>
                                 Gérer Coopératives
                             </div>
-                            <i class="fas fa-chevron-right"></i>
+                            <span class="badge bg-info">{{ \App\Models\Cooperative::where('status', 'pending')->count() }}</span>
                         </a>
                         <a href="{{ route('admin.users.index') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                             <div>
-                            <i class="fas fa-users text-success me-3"></i>
+                                <i class="fas fa-users text-success me-3"></i>
                                 Gérer Utilisateurs
                             </div>
                             <i class="fas fa-chevron-right"></i>
-                       </a>
+                        </a>
+                        <a href="{{ route('admin.product-requests.index') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="fas fa-box-open text-warning me-3"></i>
+                                Demandes de Produits
+                            </div>
+                            <span class="badge bg-warning">{{ $productStats['pending'] }}</span>
+                        </a>
                         <a href="{{ route('admin.categories.index') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                             <div>
                                 <i class="fas fa-tags text-info me-3"></i>
@@ -214,7 +347,7 @@
                         </a>
                         <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                             <div>
-                                <i class="fas fa-chart-bar text-warning me-3"></i>
+                                <i class="fas fa-chart-bar text-dark me-3"></i>
                                 Rapports & Statistiques
                             </div>
                             <i class="fas fa-chevron-right"></i>
@@ -225,6 +358,45 @@
                                 Paramètres Système
                             </div>
                             <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Product Management Summary -->
+            <div class="card shadow mt-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-warning">
+                        <i class="fas fa-box-open me-2"></i>
+                        Résumé Produits
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6 border-end">
+                            <div class="h4 mb-0 text-warning">{{ $productStats['pending'] }}</div>
+                            <small class="text-muted">En attente</small>
+                        </div>
+                        <div class="col-6">
+                            <div class="h4 mb-0 text-success">{{ $productStats['approved'] }}</div>
+                            <small class="text-muted">Approuvés</small>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="row text-center">
+                        <div class="col-6 border-end">
+                            <div class="h5 mb-0 text-danger">{{ $productStats['rejected_or_info'] }}</div>
+                            <small class="text-muted">Rejetés/Info</small>
+                        </div>
+                        <div class="col-6">
+                            <div class="h5 mb-0 text-primary">{{ $productStats['total'] }}</div>
+                            <small class="text-muted">Total</small>
+                        </div>
+                    </div>
+                    <div class="text-center mt-3">
+                        <a href="{{ route('admin.product-requests.index') }}" class="btn btn-warning btn-sm">
+                            <i class="fas fa-eye me-1"></i>
+                            Voir toutes les demandes
                         </a>
                     </div>
                 </div>
@@ -242,9 +414,42 @@
                 <div class="card-body">
                     <div class="timeline">
                         @php
-                            $recentCategories = \App\Models\Category::latest()->take(3)->get();
+                            $recentProducts = \App\Models\Product::with(['cooperative', 'category'])
+                                ->whereIn('status', ['pending', 'approved', 'rejected'])
+                                ->where('submitted_at', '!=', null)
+                                ->latest('submitted_at')
+                                ->take(3)
+                                ->get();
+
+                            $recentCategories = \App\Models\Category::latest()->take(2)->get();
                             $recentCoops = \App\Models\Cooperative::latest()->take(2)->get();
                         @endphp
+
+                        @foreach($recentProducts as $product)
+                        <div class="timeline-item">
+                            <div class="timeline-marker bg-{{ $product->status === 'approved' ? 'success' : ($product->status === 'pending' ? 'warning' : 'danger') }}"></div>
+                            <div class="timeline-content">
+                                <h6 class="timeline-title">
+                                    @if($product->status === 'pending')
+                                        Nouvelle demande de produit
+                                    @elseif($product->status === 'approved')
+                                        Produit approuvé
+                                    @else
+                                        Produit rejeté
+                                    @endif
+                                </h6>
+                                <p class="timeline-text">
+                                    <strong>{{ $product->name }}</strong> par {{ $product->cooperative->name }}
+                                    <br>
+                                    <small class="text-muted">
+                                        <i class="fas fa-tag me-1"></i>
+                                        {{ $product->category->name }} - {{ number_format($product->price, 2) }} MAD
+                                    </small>
+                                </p>
+                                <small class="text-muted">{{ $product->submitted_at->diffForHumans() }}</small>
+                            </div>
+                        </div>
+                        @endforeach
 
                         @foreach($recentCategories as $category)
                         <div class="timeline-item">
@@ -259,10 +464,10 @@
 
                         @foreach($recentCoops as $coop)
                         <div class="timeline-item">
-                            <div class="timeline-marker bg-{{ $coop->status === 'approved' ? 'success' : 'warning' }}"></div>
+                            <div class="timeline-marker bg-{{ $coop->status === 'approved' ? 'success' : 'primary' }}"></div>
                             <div class="timeline-content">
                                 <h6 class="timeline-title">
-                                    {{ $coop->status === 'approved' ? 'Coopérative approuvée' : 'Nouvelle demande' }}
+                                    {{ $coop->status === 'approved' ? 'Coopérative approuvée' : 'Nouvelle demande de coopérative' }}
                                 </h6>
                                 <p class="timeline-text">{{ $coop->name }} - {{ $coop->sector_of_activity }}</p>
                                 <small class="text-muted">{{ $coop->created_at->diffForHumans() }}</small>
@@ -281,6 +486,8 @@
 .border-left-success { border-left: 0.25rem solid #1cc88a !important; }
 .border-left-info { border-left: 0.25rem solid #36b9cc !important; }
 .border-left-warning { border-left: 0.25rem solid #f6c23e !important; }
+.border-left-danger { border-left: 0.25rem solid #e74a3b !important; }
+.border-left-dark { border-left: 0.25rem solid #5a5c69 !important; }
 
 .timeline {
     position: relative;
@@ -328,5 +535,36 @@
     color: #6c757d;
     font-size: 13px;
 }
+
+.product-preview-card {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: none;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.product-preview-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+}
+
+.product-preview-image {
+    height: 120px;
+    width: 100%;
+    object-fit: cover;
+}
 </style>
 @endsection
+
+@push('scripts')
+<script>
+function viewProductRequest(productId) {
+    window.open(`{{ route('admin.product-requests.index') }}?search=&status=pending`, '_blank');
+}
+
+// Auto-refresh stats every 5 minutes
+setInterval(function() {
+    // You can implement AJAX refresh of stats here if needed
+}, 300000);
+</script>
+@endpush

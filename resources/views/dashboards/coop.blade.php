@@ -43,80 +43,246 @@
         </div>
     @endif
 
-    <!-- Stats Cards -->
-    <div class="row mb-4">
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-primary shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                Produits Actifs
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">23</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-box fa-2x text-gray-300"></i>
-                        </div>
+    @if(Auth::user()->cooperative && Auth::user()->cooperative->status !== 'approved')
+        <div class="row mb-4">
+            <div class="col-12">
+                @if(Auth::user()->cooperative->status === 'pending')
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Coopérative en attente d'approbation</strong> -
+                        Votre coopérative est en cours d'examen. Vous pourrez gérer vos produits une fois approuvée.
                     </div>
-                </div>
+                @elseif(Auth::user()->cooperative->status === 'suspended')
+                    <div class="alert alert-danger">
+                        <i class="fas fa-ban me-2"></i>
+                        <strong>Coopérative suspendue</strong> -
+                        Votre coopérative est temporairement suspendue. Contactez l'administration pour plus d'informations.
+                    </div>
+                @endif
             </div>
         </div>
+    @endif
 
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-success shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                                Commandes du Mois
-                            </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">47</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-shopping-cart fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <!-- Product Stats Cards -->
+    @if(Auth::user()->cooperative && Auth::user()->cooperative->status === 'approved')
+        @php
+            $productStats = [
+                'total' => Auth::user()->cooperative->products()->count(),
+                'approved' => Auth::user()->cooperative->products()->where('status', 'approved')->count(),
+                'pending' => Auth::user()->cooperative->products()->where('status', 'pending')->count(),
+                'draft' => Auth::user()->cooperative->products()->where('status', 'draft')->count(),
+                'revenue' => Auth::user()->cooperative->products()->where('status', 'approved')->sum('price') * 0.85, // Estimated monthly revenue
+                'low_stock' => Auth::user()->cooperative->products()->where('status', 'approved')->where('stock_quantity', '<=', 5)->count()
+            ];
+        @endphp
 
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-info shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
-                                Revenus du Mois
+        <div class="row mb-4">
+            <div class="col-xl-2 col-md-4 mb-4">
+                <div class="card border-left-primary shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                    Total Produits
+                                </div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $productStats['total'] }}</div>
                             </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">8,420 MAD</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-coins fa-2x text-gray-300"></i>
+                            <div class="col-auto">
+                                <i class="fas fa-box fa-2x text-gray-300"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-warning shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                Note Moyenne
+            <div class="col-xl-2 col-md-4 mb-4">
+                <div class="card border-left-success shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                    Produits Actifs
+                                </div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $productStats['approved'] }}</div>
                             </div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">4.8/5</div>
+                            <div class="col-auto">
+                                <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                            </div>
                         </div>
-                        <div class="col-auto">
-                            <i class="fas fa-star fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-2 col-md-4 mb-4">
+                <div class="card border-left-warning shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                    En Attente
+                                </div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $productStats['pending'] }}</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-clock fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-2 col-md-4 mb-4">
+                <div class="card border-left-info shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                    Brouillons
+                                </div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $productStats['draft'] }}</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-edit fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-2 col-md-4 mb-4">
+                <div class="card border-left-danger shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                                    Stock Faible
+                                </div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $productStats['low_stock'] }}</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-2 col-md-4 mb-4">
+                <div class="card border-left-dark shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-dark text-uppercase mb-1">
+                                    Revenus Estimés
+                                </div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ number_format($productStats['revenue'], 0) }} MAD</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-coins fa-2x text-gray-300"></i>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+    @else
+        <!-- Basic Stats for Non-Approved Cooperatives -->
+        <div class="row mb-4">
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card border-left-info shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                    Statut Coopérative
+                                </div>
+                                <div class="h6 mb-0 font-weight-bold text-gray-800">
+                                    @if(Auth::user()->cooperative)
+                                        <span class="badge bg-{{ Auth::user()->cooperative->status === 'approved' ? 'success' : (Auth::user()->cooperative->status === 'pending' ? 'warning' : 'danger') }}">
+                                            {{ ucfirst(Auth::user()->cooperative->status) }}
+                                        </span>
+                                    @else
+                                        Non défini
+                                    @endif
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-building fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card border-left-primary shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                    Votre Rôle
+                                </div>
+                                <div class="h6 mb-0 font-weight-bold text-gray-800">
+                                    @if(Auth::user()->isPrimaryAdmin())
+                                        Admin Principal
+                                    @else
+                                        Administrateur
+                                    @endif
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-user-shield fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card border-left-success shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                    Membre depuis
+                                </div>
+                                <div class="h6 mb-0 font-weight-bold text-gray-800">
+                                    {{ Auth::user()->created_at->format('M Y') }}
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-calendar fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card border-left-warning shadow h-100 py-2">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                    Produits
+                                </div>
+                                <div class="h6 mb-0 font-weight-bold text-gray-800">
+                                    @if(Auth::user()->cooperative && Auth::user()->cooperative->status === 'approved')
+                                        {{ Auth::user()->cooperative->products()->count() }}
+                                    @else
+                                        Non disponible
+                                    @endif
+                                </div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-box fa-2x text-gray-300"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 
     <!-- ADMIN MANAGEMENT SECTION - ONLY FOR PRIMARY ADMIN -->
     @if(Auth::user()->isPrimaryAdmin())
@@ -239,56 +405,177 @@
 
     <!-- Content Row -->
     <div class="row">
-        <!-- Recent Orders -->
+        <!-- Recent Products / Orders -->
         <div class="col-lg-8 mb-4">
-            <div class="card shadow">
-                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-primary">Commandes Récentes</h6>
-                    <a href="#" class="btn btn-primary btn-sm">Voir tout</a>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-bordered" width="100%" cellspacing="0">
-                            <thead>
-                                <tr>
-                                    <th>N° Commande</th>
-                                    <th>Client</th>
-                                    <th>Produits</th>
-                                    <th>Montant</th>
-                                    <th>Statut</th>
-                                    <th>Date</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>CMD-2025-001</td>
-                                    <td>Amina Benali</td>
-                                    <td>2 articles</td>
-                                    <td>350 MAD</td>
-                                    <td><span class="badge bg-success">Confirmée</span></td>
-                                    <td>23/05/2025</td>
-                                </tr>
-                                <tr>
-                                    <td>CMD-2025-002</td>
-                                    <td>Hassan Rachid</td>
-                                    <td>1 article</td>
-                                    <td>180 MAD</td>
-                                    <td><span class="badge bg-warning">En cours</span></td>
-                                    <td>22/05/2025</td>
-                                </tr>
-                                <tr>
-                                    <td>CMD-2025-003</td>
-                                    <td>Fatima Zahra</td>
-                                    <td>3 articles</td>
-                                    <td>520 MAD</td>
-                                    <td><span class="badge bg-info">Expédiée</span></td>
-                                    <td>21/05/2025</td>
-                                </tr>
-                            </tbody>
-                        </table>
+            @if(Auth::user()->cooperative && Auth::user()->cooperative->status === 'approved')
+                <!-- Recent Products -->
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                        <h6 class="m-0 font-weight-bold text-primary">Produits Récents</h6>
+                        <a href="{{ route('coop.products.index') }}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-box me-1"></i>
+                            Voir tous
+                        </a>
+                    </div>
+                    <div class="card-body">
+                        @php
+                            $recentProducts = Auth::user()->cooperative->products()
+                                ->with(['category', 'images'])
+                                ->orderBy('updated_at', 'desc')
+                                ->take(5)
+                                ->get();
+                        @endphp
+
+                        @if($recentProducts->count() > 0)
+                            <div class="table-responsive">
+                                <table class="table table-bordered" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th width="60">Image</th>
+                                            <th>Produit</th>
+                                            <th>Catégorie</th>
+                                            <th>Prix</th>
+                                            <th>Stock</th>
+                                            <th>Statut</th>
+                                            <th>Mis à jour</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($recentProducts as $product)
+                                        <tr>
+                                            <td>
+                                                @if($product->primaryImageUrl)
+                                                    <img src="{{ $product->primaryImageUrl }}"
+                                                         class="img-thumbnail"
+                                                         style="width: 50px; height: 50px; object-fit: cover;">
+                                                @else
+                                                    <div class="bg-light text-center d-flex align-items-center justify-content-center"
+                                                         style="width: 50px; height: 50px;">
+                                                        <i class="fas fa-image text-muted"></i>
+                                                    </div>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                <strong>{{ $product->name }}</strong>
+                                                <br>
+                                                <small class="text-muted">{{ Str::limit($product->description, 50) }}</small>
+                                            </td>
+                                            <td>{{ $product->category->name }}</td>
+                                            <td><strong>{{ number_format($product->price, 2) }} MAD</strong></td>
+                                            <td>
+                                                <span class="badge bg-{{ $product->stock_quantity <= 5 ? 'danger' : ($product->stock_quantity <= 10 ? 'warning' : 'success') }}">
+                                                    {{ $product->stock_quantity }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-{{ $product->status_badge }}">
+                                                    {{ $product->status_text }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <small>{{ $product->updated_at->format('d/m/Y') }}</small>
+                                            </td>
+                                        </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <div class="text-center py-4">
+                                <i class="fas fa-box fa-3x text-muted mb-3"></i>
+                                <h5>Aucun produit</h5>
+                                <p class="text-muted">Commencez par ajouter votre premier produit.</p>
+                                <a href="{{ route('coop.products.create') }}" class="btn btn-primary">
+                                    <i class="fas fa-plus me-2"></i>
+                                    Ajouter un produit
+                                </a>
+                            </div>
+                        @endif
                     </div>
                 </div>
-            </div>
+
+                <!-- Low Stock Alert -->
+                @php
+                    $lowStockProducts = Auth::user()->cooperative->products()
+                        ->where('status', 'approved')
+                        ->where('stock_quantity', '<=', 5)
+                        ->orderBy('stock_quantity', 'asc')
+                        ->take(5)
+                        ->get();
+                @endphp
+
+                @if($lowStockProducts->count() > 0)
+                <div class="card shadow">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Alertes Stock Faible
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered" width="100%" cellspacing="0">
+                                <thead>
+                                    <tr>
+                                        <th>Produit</th>
+                                        <th>Stock Actuel</th>
+                                        <th>Statut</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($lowStockProducts as $product)
+                                    <tr>
+                                        <td>
+                                            <strong>{{ $product->name }}</strong>
+                                            <br>
+                                            <small class="text-muted">{{ $product->category->name }}</small>
+                                        </td>
+                                        <td>
+                                            <span class="fw-bold text-{{ $product->stock_quantity == 0 ? 'danger' : 'warning' }}">
+                                                {{ $product->stock_quantity }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-{{ $product->stock_quantity == 0 ? 'danger' : 'warning' }}">
+                                                {{ $product->stock_quantity == 0 ? 'Rupture de Stock' : 'Stock Critique' }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <a href="{{ route('coop.products.edit', $product) }}" class="btn btn-primary btn-sm">
+                                                <i class="fas fa-edit me-1"></i>
+                                                Réapprovisionner
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                @endif
+            @else
+                <!-- Placeholder for non-approved cooperatives -->
+                <div class="card shadow">
+                    <div class="card-header py-3">
+                        <h6 class="m-0 font-weight-bold text-muted">Gestion des Produits</h6>
+                    </div>
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-lock fa-4x text-muted mb-3"></i>
+                        <h5 class="text-muted">Accès Restreint</h5>
+                        <p class="text-muted">
+                            La gestion des produits sera disponible une fois que votre coopérative sera approuvée par l'administration.
+                        </p>
+                        @if(Auth::user()->cooperative && Auth::user()->cooperative->status === 'pending')
+                            <p class="small text-info">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Votre coopérative est actuellement en attente d'approbation.
+                            </p>
+                        @endif
+                    </div>
+                </div>
+            @endif
         </div>
 
         <!-- Quick Actions & Info -->
@@ -300,23 +587,44 @@
                 </div>
                 <div class="card-body">
                     <div class="list-group list-group-flush">
-                        <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                            <div>
-                                <i class="fas fa-plus text-success me-3"></i>
-                                Ajouter Produit
+                        @if(Auth::user()->cooperative && Auth::user()->cooperative->status === 'approved')
+                            <a href="{{ route('coop.products.create') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                <div>
+                                    <i class="fas fa-plus text-success me-3"></i>
+                                    Ajouter Produit
+                                </div>
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                            <a href="{{ route('coop.products.index') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                <div>
+                                    <i class="fas fa-box text-primary me-3"></i>
+                                    Mes Produits
+                                </div>
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                            <a href="{{ route('coop.products.index', ['status' => 'pending']) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                <div>
+                                    <i class="fas fa-clock text-warning me-3"></i>
+                                    Produits en Attente
+                                </div>
+                                <span class="badge bg-warning">{{ $productStats['pending'] ?? 0 }}</span>
+                            </a>
+                            <a href="{{ route('coop.products.index', ['status' => 'draft']) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                <div>
+                                    <i class="fas fa-edit text-info me-3"></i>
+                                    Brouillons
+                                </div>
+                                <span class="badge bg-info">{{ $productStats['draft'] ?? 0 }}</span>
+                            </a>
+                        @else
+                            <div class="list-group-item text-center py-4">
+                                <i class="fas fa-lock fa-2x text-muted mb-2"></i>
+                                <p class="text-muted mb-0">Actions disponibles après approbation</p>
                             </div>
-                            <i class="fas fa-chevron-right"></i>
-                        </a>
+                        @endif
                         <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                             <div>
-                                <i class="fas fa-box text-primary me-3"></i>
-                                Gérer Stock
-                            </div>
-                            <i class="fas fa-chevron-right"></i>
-                        </a>
-                        <a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
-                            <div>
-                                <i class="fas fa-shopping-cart text-info me-3"></i>
+                                <i class="fas fa-shopping-cart text-success me-3"></i>
                                 Commandes
                             </div>
                             <i class="fas fa-chevron-right"></i>
@@ -352,9 +660,13 @@
                         <i class="fas fa-phone me-2"></i>
                         {{ Auth::user()->cooperative->phone }}
                     </p>
-                    <p class="text-muted mb-0">
+                    <p class="text-muted mb-2">
                         <i class="fas fa-calendar me-2"></i>
                         Créée le {{ Auth::user()->cooperative->date_created->format('d/m/Y') }}
+                    </p>
+                    <p class="text-muted mb-0">
+                        <i class="fas fa-{{ Auth::user()->cooperative->status === 'approved' ? 'check-circle text-success' : (Auth::user()->cooperative->status === 'pending' ? 'clock text-warning' : 'times-circle text-danger') }} me-2"></i>
+                        Statut: <strong>{{ ucfirst(Auth::user()->cooperative->status) }}</strong>
                     </p>
                     @if(Auth::user()->isPrimaryAdmin())
                         <div class="mt-3 pt-2 border-top">
@@ -366,58 +678,30 @@
                     @endif
                 </div>
             </div>
-            @endif
-        </div>
-    </div>
-
-    <!-- Low Stock Alert -->
-    <div class="row">
-        <div class="col-12">
+            @else
+            <!-- No Cooperative Info -->
             <div class="card shadow">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-warning">Alertes Stock Faible</h6>
+                    <h6 class="m-0 font-weight-bold text-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Aucune Coopérative
+                    </h6>
                 </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-bordered" width="100%" cellspacing="0">
-                            <thead>
-                                <tr>
-                                    <th>Produit</th>
-                                    <th>Stock Actuel</th>
-                                    <th>Stock Minimum</th>
-                                    <th>Statut</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>Huile d'Argan Bio 250ml</td>
-                                    <td>3</td>
-                                    <td>10</td>
-                                    <td><span class="badge bg-danger">Stock Critique</span></td>
-                                    <td>
-                                        <button class="btn btn-primary btn-sm">Réapprovisionner</button>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>Savon Naturel Lavande</td>
-                                    <td>7</td>
-                                    <td>15</td>
-                                    <td><span class="badge bg-warning">Stock Faible</span></td>
-                                    <td>
-                                        <button class="btn btn-primary btn-sm">Réapprovisionner</button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                <div class="card-body text-center">
+                    <i class="fas fa-building fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">Vous n'êtes associé à aucune coopérative.</p>
+                    <a href="{{ route('coop.register') }}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus me-1"></i>
+                        Rejoindre/Créer une Coopérative
+                    </a>
                 </div>
             </div>
+            @endif
         </div>
     </div>
 </div>
 
-<!-- MODALS - ONLY FOR PRIMARY ADMIN -->
+<!-- Include existing modals for primary admin -->
 @if(Auth::user()->isPrimaryAdmin())
 <!-- Request Details Modal -->
 <div class="modal fade" id="requestDetailsModal" tabindex="-1" aria-labelledby="requestDetailsModalLabel" aria-hidden="true">
@@ -598,13 +882,14 @@
     </div>
 </div>
 @endif
-<!-- END MODALS FOR PRIMARY ADMIN -->
 
 <style>
 .border-left-primary { border-left: 0.25rem solid #4e73df !important; }
 .border-left-success { border-left: 0.25rem solid #1cc88a !important; }
 .border-left-info { border-left: 0.25rem solid #36b9cc !important; }
 .border-left-warning { border-left: 0.25rem solid #f6c23e !important; }
+.border-left-danger { border-left: 0.25rem solid #e74a3b !important; }
+.border-left-dark { border-left: 0.25rem solid #5a5c69 !important; }
 
 .request-card {
     transition: all 0.2s ease;
