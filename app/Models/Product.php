@@ -24,6 +24,7 @@ class Product extends Model
         'reviewed_at',
         'reviewed_by',
         'admin_notes',
+        'original_data', // NEW: Store original approved version
     ];
 
     protected $casts = [
@@ -31,6 +32,7 @@ class Product extends Model
         'is_active' => 'boolean',
         'submitted_at' => 'datetime',
         'reviewed_at' => 'datetime',
+        'original_data' => 'array', // NEW: Cast to array for JSON handling
     ];
 
     public function cooperative()
@@ -96,12 +98,33 @@ class Product extends Model
 
     public function canBeEdited()
     {
-        return in_array($this->status, ['draft', 'rejected', 'needs_info']);
+        return in_array($this->status, ['draft', 'rejected', 'needs_info', 'approved']); // NEW: Allow editing approved products
     }
 
     public function canBeSubmitted()
     {
         return in_array($this->status, ['draft', 'rejected', 'needs_info']);
+    }
+
+    // NEW: Check if this is an updated version of a previously approved product
+    public function isUpdatedVersion()
+    {
+        return !empty($this->original_data);
+    }
+
+    // NEW: Store current data as original version before update
+    public function storeOriginalData()
+    {
+        $this->original_data = [
+            'name' => $this->name,
+            'description' => $this->description,
+            'price' => $this->price,
+            'stock_quantity' => $this->stock_quantity,
+            'category_id' => $this->category_id,
+            'category_name' => $this->category->name ?? 'N/A',
+            'images_count' => $this->images->count(),
+            'updated_at' => $this->updated_at->toISOString(),
+        ];
     }
 
     // Get primary image URL or fallback

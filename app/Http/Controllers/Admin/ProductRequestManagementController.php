@@ -80,61 +80,7 @@ class ProductRequestManagementController extends Controller
         return view('admin.product-requests.show', compact('product'));
     }
 
-    /**
-     * Approve product request
-     */
-    public function approve(Request $request, Product $product)
-    {
-        /** @var User $user */
-        $user = Auth::user();
-
-        if ($product->status !== 'pending' && $product->status !== 'needs_info') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Ce produit ne peut pas être approuvé dans son état actuel.'
-            ], 400);
-        }
-
-        $request->validate([
-            'admin_notes' => 'nullable|string|max:1000'
-        ]);
-
-        DB::beginTransaction();
-
-        try {
-            $product->update([
-                'status' => 'approved',
-                'is_active' => true,
-                'reviewed_at' => now(),
-                'reviewed_by' => $user->id,
-                'admin_notes' => $request->admin_notes,
-                'rejection_reason' => null,
-            ]);
-
-            // Send approval email
-            $this->sendApprovalEmail($product, $request->admin_notes);
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => "Produit '{$product->name}' approuvé avec succès!"
-            ]);
-
-        } catch (\Exception $e) {
-            DB::rollback();
-            Log::error('Error approving product', [
-                'product_id' => $product->id,
-                'error' => $e->getMessage(),
-                'user_id' => $user->id
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Erreur lors de l\'approbation: ' . $e->getMessage()
-            ], 500);
-        }
-    }
+   
 
     /**
      * Reject product request
@@ -393,4 +339,46 @@ class ProductRequestManagementController extends Controller
             EmailService::sendNotificationEmail($email, $subject, $message);
         }
     }
+
+    public function approve(Request $request, Product $product)
+{
+    $request->validate([
+        'admin_notes' => 'nullable|string|max:2000'
+    ]);
+
+    try {
+        DB::beginTransaction();
+
+        $product->status = 'approved';
+        $product->admin_notes = $request->admin_notes;
+        $product->reviewed_at = now();
+        $product->reviewed_by = Auth::id();
+        $product->rejection_reason = null;
+
+        // NEW: Clear original_data when product is approved
+        $product->original_data = null;
+
+        $product->save();
+
+        DB::commit();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Produit approuvé avec succès!'
+        ]);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('Product approval error', [
+            'error' => $e->getMessage(),
+            'product_id' => $product->id,
+            'admin_id' => Auth::id()
+        ]);
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Erreur lors de l\'approbation du produit.'
+        ], 500);
+    }
+}
 }

@@ -132,6 +132,12 @@
                                                 <span class="badge bg-{{ $product->status_badge }}">
                                                     {{ $product->status_text }}
                                                 </span>
+                                                @if($product->isUpdatedVersion())
+                                                    <span class="badge bg-warning text-dark ms-1">
+                                                        <i class="fas fa-sync-alt"></i>
+                                                        Mis à jour
+                                                    </span>
+                                                @endif
                                             </div>
                                         </div>
 
@@ -190,13 +196,12 @@
                                                     </button>
                                                 @endif
 
-                                                @if($product->isDraft())
-                                                    <button class="btn btn-danger btn-sm"
-                                                            onclick="deleteProduct({{ $product->id }}, '{{ addslashes($product->name) }}')">
-                                                        <i class="fas fa-trash me-1"></i>
-                                                        Supprimer
-                                                    </button>
-                                                @endif
+                                                <!-- NEW: Allow deletion of all product types -->
+                                                <button class="btn btn-danger btn-sm"
+                                                        onclick="deleteProduct({{ $product->id }}, '{{ addslashes($product->name) }}', '{{ $product->status }}')">
+                                                    <i class="fas fa-trash me-1"></i>
+                                                    Supprimer
+                                                </button>
 
                                                 @if($product->rejection_reason || $product->admin_notes)
                                                     <button class="btn btn-info btn-sm"
@@ -353,8 +358,39 @@ function submitProduct(productId) {
     });
 }
 
-function deleteProduct(productId, productName) {
-    if (!confirm(`Êtes-vous sûr de vouloir supprimer le produit "${productName}" ?`)) {
+function deleteProduct(productId, productName, productStatus) {
+    // NEW: Different confirmation messages based on product status
+    let confirmMessage = '';
+    let warningMessage = '';
+
+    switch(productStatus) {
+        case 'draft':
+            confirmMessage = `Êtes-vous sûr de vouloir supprimer le brouillon "${productName}" ?`;
+            break;
+        case 'pending':
+            confirmMessage = `Êtes-vous sûr de vouloir supprimer le produit "${productName}" en attente d'approbation ?`;
+            warningMessage = 'Ce produit est en cours d\'examen par l\'administration.';
+            break;
+        case 'approved':
+            confirmMessage = `Êtes-vous sûr de vouloir supprimer le produit approuvé "${productName}" ?`;
+            warningMessage = 'ATTENTION: Ce produit est approuvé et visible aux clients!';
+            break;
+        case 'rejected':
+            confirmMessage = `Êtes-vous sûr de vouloir supprimer le produit rejeté "${productName}" ?`;
+            break;
+        case 'needs_info':
+            confirmMessage = `Êtes-vous sûr de vouloir supprimer le produit "${productName}" ?`;
+            warningMessage = 'L\'administration attend des clarifications sur ce produit.';
+            break;
+        default:
+            confirmMessage = `Êtes-vous sûr de vouloir supprimer le produit "${productName}" ?`;
+    }
+
+    if (warningMessage) {
+        confirmMessage = warningMessage + '\n\n' + confirmMessage;
+    }
+
+    if (!confirm(confirmMessage)) {
         return;
     }
 
