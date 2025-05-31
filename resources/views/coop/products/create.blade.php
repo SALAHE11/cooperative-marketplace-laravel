@@ -83,7 +83,7 @@
 
                         <!-- Price and Stock Row -->
                         <div class="row">
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <div class="mb-3">
                                     <label for="price" class="form-label">
                                         <i class="fas fa-coins me-1"></i>
@@ -98,7 +98,7 @@
                                     <div class="invalid-feedback" id="price_error"></div>
                                 </div>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <div class="mb-3">
                                     <label for="stock_quantity" class="form-label">
                                         <i class="fas fa-warehouse me-1"></i>
@@ -107,6 +107,20 @@
                                     <input type="number" class="form-control" id="stock_quantity" name="stock_quantity"
                                            min="0" required placeholder="0">
                                     <div class="invalid-feedback" id="stock_quantity_error"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="stock_alert_threshold" class="form-label">
+                                        <i class="fas fa-bell me-1"></i>
+                                        Seuil d'Alerte Stock *
+                                    </label>
+                                    <input type="number" class="form-control" id="stock_alert_threshold" name="stock_alert_threshold"
+                                           min="0" max="1000" value="5" required placeholder="5">
+                                    <div class="invalid-feedback" id="stock_alert_threshold_error"></div>
+                                    <div class="form-text">
+                                        Alerte si stock ≤ cette valeur
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -177,10 +191,35 @@
                 </div>
             </div>
 
+            <!-- Stock Alert Info Card -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-warning">
+                        <i class="fas fa-bell me-2"></i>
+                        Alertes Stock
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="small">
+                        <p><strong>Fonctionnement:</strong></p>
+                        <ul>
+                            <li>Vous serez alerté quand le stock atteint le seuil configuré</li>
+                            <li>Les produits en stock faible apparaîtront avec un indicateur</li>
+                            <li>Le tableau de bord affichera le nombre total d'alertes</li>
+                            <li>Vous pouvez modifier ce seuil à tout moment</li>
+                        </ul>
+
+                        <div class="alert alert-light mt-3">
+                            <strong>Exemple:</strong> Si vous définissez le seuil à 5, vous serez alerté quand il reste 5 unités ou moins.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Help Card -->
             <div class="card shadow">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-warning">
+                    <h6 class="m-0 font-weight-bold text-info">
                         <i class="fas fa-lightbulb me-2"></i>
                         Conseils
                     </h6>
@@ -200,6 +239,13 @@
                             <li>Soyez précis et détaillé</li>
                             <li>Mentionnez les caractéristiques importantes</li>
                             <li>Indiquez la provenance et la qualité</li>
+                        </ul>
+
+                        <p><strong>Stock:</strong></p>
+                        <ul>
+                            <li>Configurez un seuil d'alerte réaliste</li>
+                            <li>Tenez compte de votre fréquence de réapprovisionnement</li>
+                            <li>Plus le produit est populaire, plus le seuil devrait être élevé</li>
                         </ul>
                     </div>
                 </div>
@@ -281,6 +327,16 @@
     border-radius: 3px;
     font-size: 0.7rem;
 }
+
+/* Stock alert threshold input styling */
+#stock_alert_threshold {
+    border-left: 3px solid #ffc107;
+}
+
+#stock_alert_threshold:focus {
+    border-left-color: #ff8f00;
+    box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25);
+}
 </style>
 @endpush
 
@@ -297,6 +353,27 @@ document.addEventListener('DOMContentLoaded', function() {
         descriptionCount.textContent = this.value.length;
     });
 
+    // Stock alert threshold validation
+    const stockQuantityInput = document.getElementById('stock_quantity');
+    const stockAlertInput = document.getElementById('stock_alert_threshold');
+
+    // Auto-suggest stock alert threshold based on stock quantity
+    stockQuantityInput.addEventListener('input', function() {
+        const stockQuantity = parseInt(this.value) || 0;
+        const currentThreshold = parseInt(stockAlertInput.value) || 5;
+
+        // Suggest 10% of stock quantity or minimum 5, whichever is higher
+        const suggestedThreshold = Math.max(5, Math.floor(stockQuantity * 0.1));
+
+        // Only update if current threshold is default (5) or very low
+        if (currentThreshold <= 5 && stockQuantity > 50) {
+            stockAlertInput.value = suggestedThreshold;
+
+            // Show a brief tooltip or message
+            showThresholdSuggestion(suggestedThreshold);
+        }
+    });
+
     // File input change handler
     document.getElementById('images').addEventListener('change', function(e) {
         handleFileSelection(e.target.files);
@@ -310,6 +387,26 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('submitBtn').addEventListener('click', function() {
         submitForm('submit');
     });
+
+    function showThresholdSuggestion(threshold) {
+        // Create a small notification
+        const notification = document.createElement('div');
+        notification.className = 'alert alert-info alert-dismissible fade show position-fixed';
+        notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        notification.innerHTML = `
+            <i class="fas fa-lightbulb me-2"></i>
+            Seuil d'alerte suggéré: ${threshold} unités
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 4000);
+    }
 
     function handleFileSelection(files) {
         const fileArray = Array.from(files);
@@ -387,6 +484,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function submitForm(action) {
         clearErrors();
+
+        // Additional validation for stock alert threshold
+        const stockQuantity = parseInt(document.getElementById('stock_quantity').value) || 0;
+        const stockAlertThreshold = parseInt(document.getElementById('stock_alert_threshold').value) || 0;
+
+        if (stockAlertThreshold > stockQuantity && stockQuantity > 0) {
+            showError('Le seuil d\'alerte ne peut pas être supérieur à la quantité en stock.');
+            document.getElementById('stock_alert_threshold').classList.add('is-invalid');
+            return;
+        }
 
         const formData = new FormData();
         const form = document.getElementById('productForm');

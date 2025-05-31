@@ -71,8 +71,9 @@
                 'approved' => Auth::user()->cooperative->products()->where('status', 'approved')->count(),
                 'pending' => Auth::user()->cooperative->products()->where('status', 'pending')->count(),
                 'draft' => Auth::user()->cooperative->products()->where('status', 'draft')->count(),
-                'revenue' => Auth::user()->cooperative->products()->where('status', 'approved')->sum('price') * 0.85, // Estimated monthly revenue
-                'low_stock' => Auth::user()->cooperative->products()->where('status', 'approved')->where('stock_quantity', '<=', 5)->count()
+                'revenue' => Auth::user()->cooperative->products()->where('status', 'approved')->sum('price') * 0.85,
+                'low_stock' => Auth::user()->cooperative->products()->where('status', 'approved')->whereRaw('stock_quantity <= stock_alert_threshold')->count(),
+                'out_of_stock' => Auth::user()->cooperative->products()->where('status', 'approved')->where('stock_quantity', 0)->count()
             ];
         @endphp
 
@@ -157,7 +158,12 @@
                                 <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
                                     Stock Faible
                                 </div>
-                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $productStats['low_stock'] }}</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                    {{ $productStats['low_stock'] }}
+                                    @if($productStats['low_stock'] > 0)
+                                        <i class="fas fa-exclamation-triangle text-danger ms-1"></i>
+                                    @endif
+                                </div>
                             </div>
                             <div class="col-auto">
                                 <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
@@ -173,12 +179,17 @@
                         <div class="row no-gutters align-items-center">
                             <div class="col mr-2">
                                 <div class="text-xs font-weight-bold text-dark text-uppercase mb-1">
-                                    Revenus Estimés
+                                    Rupture Stock
                                 </div>
-                                <div class="h5 mb-0 font-weight-bold text-gray-800">{{ number_format($productStats['revenue'], 0) }} MAD</div>
+                                <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                    {{ $productStats['out_of_stock'] }}
+                                    @if($productStats['out_of_stock'] > 0)
+                                        <i class="fas fa-times-circle text-danger ms-1"></i>
+                                    @endif
+                                </div>
                             </div>
                             <div class="col-auto">
-                                <i class="fas fa-coins fa-2x text-gray-300"></i>
+                                <i class="fas fa-times-circle fa-2x text-gray-300"></i>
                             </div>
                         </div>
                     </div>
@@ -436,6 +447,7 @@
                                             <th>Catégorie</th>
                                             <th>Prix</th>
                                             <th>Stock</th>
+                                            <th>Seuil Alerte</th>
                                             <th>Statut</th>
                                             <th>Mis à jour</th>
                                         </tr>
@@ -459,13 +471,22 @@
                                                 <strong>{{ $product->name }}</strong>
                                                 <br>
                                                 <small class="text-muted">{{ Str::limit($product->description, 50) }}</small>
+                                                @if($product->isStockLow())
+                                                    <br><small class="text-danger">
+                                                        <i class="fas fa-exclamation-triangle"></i>
+                                                        {{ $product->stock_status_text }}
+                                                    </small>
+                                                @endif
                                             </td>
                                             <td>{{ $product->category->name }}</td>
                                             <td><strong>{{ number_format($product->price, 2) }} MAD</strong></td>
                                             <td>
-                                                <span class="badge bg-{{ $product->stock_quantity <= 5 ? 'danger' : ($product->stock_quantity <= 10 ? 'warning' : 'success') }}">
+                                                <span class="badge bg-{{ $product->stock_status_badge }}">
                                                     {{ $product->stock_quantity }}
                                                 </span>
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">{{ $product->stock_alert_threshold }}</small>
                                             </td>
                                             <td>
                                                 <span class="badge bg-{{ $product->status_badge }}">
@@ -498,7 +519,7 @@
                 @php
                     $lowStockProducts = Auth::user()->cooperative->products()
                         ->where('status', 'approved')
-                        ->where('stock_quantity', '<=', 5)
+                        ->whereRaw('stock_quantity <= stock_alert_threshold')
                         ->orderBy('stock_quantity', 'asc')
                         ->take(5)
                         ->get();
@@ -509,7 +530,7 @@
                     <div class="card-header py-3">
                         <h6 class="m-0 font-weight-bold text-warning">
                             <i class="fas fa-exclamation-triangle me-2"></i>
-                            Alertes Stock Faible
+                            Alertes Stock Faible ({{ $lowStockProducts->count() }})
                         </h6>
                     </div>
                     <div class="card-body">
@@ -519,6 +540,7 @@
                                     <tr>
                                         <th>Produit</th>
                                         <th>Stock Actuel</th>
+                                        <th>Seuil Alerte</th>
                                         <th>Statut</th>
                                         <th>Actions</th>
                                     </tr>
@@ -532,20 +554,29 @@
                                             <small class="text-muted">{{ $product->category->name }}</small>
                                         </td>
                                         <td>
-                                            <span class="fw-bold text-{{ $product->stock_quantity == 0 ? 'danger' : 'warning' }}">
+                                            <span class="fw-bold text-{{ $product->stock_status_badge }}">
                                                 {{ $product->stock_quantity }}
                                             </span>
                                         </td>
                                         <td>
-                                            <span class="badge bg-{{ $product->stock_quantity == 0 ? 'danger' : 'warning' }}">
-                                                {{ $product->stock_quantity == 0 ? 'Rupture de Stock' : 'Stock Critique' }}
+                                            <span class="text-muted">{{ $product->stock_alert_threshold }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-{{ $product->stock_status_badge }}">
+                                                {{ $product->stock_status_text }}
                                             </span>
                                         </td>
                                         <td>
-                                            <a href="{{ route('coop.products.edit', $product) }}" class="btn btn-primary btn-sm">
-                                                <i class="fas fa-edit me-1"></i>
-                                                Réapprovisionner
-                                            </a>
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="{{ route('coop.products.edit', $product) }}" class="btn btn-primary">
+                                                    <i class="fas fa-edit me-1"></i>
+                                                    Réapprovisionner
+                                                </a>
+                                                <button type="button" class="btn btn-outline-warning"
+                                                        onclick="openStockAlertModal({{ $product->id }}, '{{ addslashes($product->name) }}', {{ $product->stock_alert_threshold }})">
+                                                    <i class="fas fa-bell"></i>
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                     @endforeach
@@ -616,6 +647,14 @@
                                 </div>
                                 <span class="badge bg-info">{{ $productStats['draft'] ?? 0 }}</span>
                             </a>
+                            <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                                    onclick="openBulkStockAlertModal()">
+                                <div>
+                                    <i class="fas fa-bell text-warning me-3"></i>
+                                    Configurer Alertes Stock
+                                </div>
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
                         @else
                             <div class="list-group-item text-center py-4">
                                 <i class="fas fa-lock fa-2x text-muted mb-2"></i>
@@ -697,6 +736,94 @@
                 </div>
             </div>
             @endif
+        </div>
+    </div>
+</div>
+
+<!-- Stock Alert Configuration Modal -->
+<div class="modal fade" id="stockAlertModal" tabindex="-1" aria-labelledby="stockAlertModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="stockAlertModalLabel">
+                    <i class="fas fa-bell me-2"></i>
+                    Configurer Seuil d'Alerte Stock
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="stockAlertForm">
+                    <div class="mb-3">
+                        <label for="productName" class="form-label">Produit</label>
+                        <input type="text" class="form-control" id="productName" readonly>
+                        <input type="hidden" id="productId">
+                    </div>
+                    <div class="mb-3">
+                        <label for="stockAlertThreshold" class="form-label">Seuil d'Alerte Stock</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="stockAlertThreshold"
+                                   min="0" max="1000" required>
+                            <span class="input-group-text">unités</span>
+                        </div>
+                        <div class="form-text">
+                            Vous serez alerté quand le stock descend à ce niveau ou en dessous.
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-warning" onclick="saveStockAlert()">
+                    <i class="fas fa-save me-1"></i>
+                    Sauvegarder
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Stock Alert Configuration Modal -->
+<div class="modal fade" id="bulkStockAlertModal" tabindex="-1" aria-labelledby="bulkStockAlertModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="bulkStockAlertModalLabel">
+                    <i class="fas fa-bell me-2"></i>
+                    Configuration Groupée des Alertes Stock
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="bulkStockAlertForm">
+                    <div class="mb-3">
+                        <label for="bulkThreshold" class="form-label">Nouveau Seuil d'Alerte</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="bulkThreshold"
+                                   min="0" max="1000" value="5" required>
+                            <span class="input-group-text">unités</span>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="applyTo" class="form-label">Appliquer à</label>
+                        <select class="form-select" id="applyTo" required>
+                            <option value="all">Tous les produits</option>
+                            <option value="approved">Produits approuvés uniquement</option>
+                            <option value="low_stock">Produits actuellement en stock faible</option>
+                        </select>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Information:</strong> Cette action modifiera le seuil d'alerte pour plusieurs produits à la fois.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-warning" onclick="saveBulkStockAlert()">
+                    <i class="fas fa-save me-1"></i>
+                    Appliquer la Configuration
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -961,6 +1088,10 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Check if user is primary admin - exit early if not
     const isPrimaryAdmin = {{ Auth::user()->isPrimaryAdmin() ? 'true' : 'false' }};
+
+    // Stock Alert Modals
+    const stockAlertModal = new bootstrap.Modal(document.getElementById('stockAlertModal'));
+    const bulkStockAlertModal = new bootstrap.Modal(document.getElementById('bulkStockAlertModal'));
 
     if (!isPrimaryAdmin) {
         // For non-primary admins, exit early - no admin management features
@@ -1569,5 +1700,117 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // === END PRIMARY ADMIN ONLY CODE ===
 });
+
+// Stock Alert Configuration Functions (Available for all cooperative admins)
+function openStockAlertModal(productId, productName, currentThreshold) {
+    document.getElementById('productId').value = productId;
+    document.getElementById('productName').value = productName;
+    document.getElementById('stockAlertThreshold').value = currentThreshold;
+
+    const stockAlertModal = new bootstrap.Modal(document.getElementById('stockAlertModal'));
+    stockAlertModal.show();
+}
+
+function openBulkStockAlertModal() {
+    const bulkStockAlertModal = new bootstrap.Modal(document.getElementById('bulkStockAlertModal'));
+    bulkStockAlertModal.show();
+}
+
+function saveStockAlert() {
+    const productId = document.getElementById('productId').value;
+    const threshold = document.getElementById('stockAlertThreshold').value;
+
+    if (!threshold || threshold < 0 || threshold > 1000) {
+        showAlert('Seuil d\'alerte invalide (0-1000)', 'danger');
+        return;
+    }
+
+    fetch(`/coop/products/${productId}/configure-stock-alert`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        },
+        body: JSON.stringify({
+            stock_alert_threshold: parseInt(threshold)
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert(data.message, 'success');
+            const stockAlertModal = bootstrap.Modal.getInstance(document.getElementById('stockAlertModal'));
+            stockAlertModal.hide();
+            // Reload page to update dashboard
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showAlert(data.message, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('Erreur de connexion au serveur', 'danger');
+    });
+}
+
+function saveBulkStockAlert() {
+    const threshold = document.getElementById('bulkThreshold').value;
+    const applyTo = document.getElementById('applyTo').value;
+
+    if (!threshold || threshold < 0 || threshold > 1000) {
+        showAlert('Seuil d\'alerte invalide (0-1000)', 'danger');
+        return;
+    }
+
+    fetch('/coop/products/bulk-configure-stock-alerts', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        },
+        body: JSON.stringify({
+            threshold: parseInt(threshold),
+            apply_to: applyTo
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert(data.message, 'success');
+            const bulkStockAlertModal = bootstrap.Modal.getInstance(document.getElementById('bulkStockAlertModal'));
+            bulkStockAlertModal.hide();
+            // Reload page to update dashboard
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showAlert(data.message, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('Erreur de connexion au serveur', 'danger');
+    });
+}
+
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+
+    document.body.appendChild(alertDiv);
+
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.parentNode.removeChild(alertDiv);
+        }
+    }, 5000);
+}
 </script>
 @endpush

@@ -90,6 +90,7 @@ class ProductManagementController extends Controller
             'description' => 'required|string|max:2000',
             'price' => 'required|numeric|min:0|max:999999.99',
             'stock_quantity' => 'required|integer|min:0',
+            'stock_alert_threshold' => 'required|integer|min:0|max:1000',
         ];
 
         if ($action === 'submit') {
@@ -112,6 +113,7 @@ class ProductManagementController extends Controller
                 'description' => $validatedData['description'],
                 'price' => $validatedData['price'],
                 'stock_quantity' => $validatedData['stock_quantity'],
+                'stock_alert_threshold' => $validatedData['stock_alert_threshold'],
                 'status' => $action === 'submit' ? 'pending' : 'draft',
                 'submitted_at' => $action === 'submit' ? now() : null,
             ]);
@@ -216,6 +218,7 @@ class ProductManagementController extends Controller
             'description' => 'required|string|max:2000',
             'price' => 'required|numeric|min:0|max:999999.99',
             'stock_quantity' => 'required|integer|min:0',
+            'stock_alert_threshold' => 'required|integer|min:0|max:1000',
             'new_images' => 'nullable|array|max:5',
             'new_images.*' => 'image|mimes:jpeg,png,jpg,webp|max:2048',
             'removed_images' => 'nullable|array',
@@ -229,7 +232,7 @@ class ProductManagementController extends Controller
 
             DB::beginTransaction();
 
-            // Check if only stock_quantity is being updated (for approved products)
+            // Check if only stock_quantity or stock_alert_threshold is being updated (for approved products)
             $isStockOnlyUpdate = false;
             if ($product->isApproved() && $action !== 'submit') {
                 $currentData = [
@@ -249,7 +252,7 @@ class ProductManagementController extends Controller
                 $hasImageChanges = $request->hasFile('new_images') ||
                                  ($request->has('removed_images') && !empty($request->removed_images));
 
-                // Check if only stock_quantity changed and no image changes
+                // Check if only stock fields changed and no image changes
                 $isStockOnlyUpdate = ($currentData === $newData) && !$hasImageChanges;
             }
 
@@ -300,6 +303,7 @@ class ProductManagementController extends Controller
                 'description' => $validatedData['description'],
                 'price' => $validatedData['price'],
                 'stock_quantity' => $validatedData['stock_quantity'],
+                'stock_alert_threshold' => $validatedData['stock_alert_threshold'],
             ]);
 
             // Update status based on action - BUT skip if it's a stock-only update
@@ -331,7 +335,7 @@ class ProductManagementController extends Controller
 
             $message = '';
             if ($isStockOnlyUpdate) {
-                $message = 'Stock mis à jour avec succès!';
+                $message = 'Stock et alertes mis à jour avec succès!';
             } else if ($action === 'submit' || ($product->isApproved() && !$isStockOnlyUpdate)) {
                 $message = 'Produit mis à jour et soumis pour ré-approbation!';
             } else {
@@ -457,7 +461,114 @@ class ProductManagementController extends Controller
         }
     }
 
-    // New method for managing images via AJAX
+    // New method for configuring stock alerts
+    public function configureStockAlert(Request $request, Product $product)
+    {
+        $user = Auth::user();
+
+        if ($product->cooperative_id !== $user->cooperative_id) {
+            return response()->json(['success' => false, 'message' => 'Accès non autorisé.'], 403);
+        }
+
+        $request->validate([
+            'stock_alert_threshold' => 'required|integer|min:0|max:1000'
+        ]);
+
+        try {
+            $oldThreshold = $product->stock_alert_threshold;
+            $newThreshold = $request->input('stock_alert_threshold');
+
+            $product->update([
+                'stock_alert_threshold' => $newThreshold
+            ]);
+
+            $message = "Seuil d'alerte mis à jour de {$oldThreshold} à {$newThreshold}";
+
+            return response()->json([
+                'success' => true,
+                'message' => $message,
+                'new_threshold' => $newThreshold,
+                'is_low_stock' => $product->isStockLow(),
+                'stock_status' => $product->stock_status
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Stock alert configuration error', [
+                'error' => $e->getMessage(),
+                'product_id' => $product->id
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la configuration du seuil d\'alerte.'
+            ], 500);
+        }
+    }
+
+    // New method for bulk stock alert configuration
+    public function bulkConfigureStockAlerts(Request $request)
+    {
+        $user = Auth::user();
+        $cooperative = $user->cooperative;
+
+        if (!$cooperative || $cooperative->status !== 'approved') {
+            return response()->json(['success' => false, 'message' => 'Coopérative non approuvée.'], 403);
+        }
+
+        $request->validate([
+            'threshold' => 'required|integer|min:0|max:1000',
+            'apply_to' => 'required|in:all,approved,low_stock',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $threshold = $request->input('threshold');
+            $applyTo = $request->input('apply_to');
+
+            $query = $cooperative->products();
+
+            switch ($applyTo) {
+                case 'approved':
+                    $query->where('status', 'approved');
+                    break;
+                case 'low_stock':
+                    $query->whereRaw('stock_quantity <= stock_alert_threshold');
+                    break;
+                // 'all' doesn't need additional filtering
+            }
+
+            $affectedCount = $query->update(['stock_alert_threshold' => $threshold]);
+
+            DB::commit();
+
+            $applyToText = [
+                'all' => 'tous les produits',
+                'approved' => 'les produits approuvés',
+                'low_stock' => 'les produits en stock faible'
+            ];
+
+            return response()->json([
+                'success' => true,
+                'message' => "Seuil d'alerte configuré à {$threshold} pour {$applyToText[$applyTo]} ({$affectedCount} produits affectés)",
+                'affected_count' => $affectedCount
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Bulk stock alert configuration error', [
+                'error' => $e->getMessage(),
+                'cooperative_id' => $cooperative->id
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la configuration groupée des seuils d\'alerte.'
+            ], 500);
+        }
+    }
+
+    // Method for managing images via AJAX
     public function manageImages(Request $request, Product $product)
     {
         $user = Auth::user();

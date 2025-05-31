@@ -18,6 +18,7 @@ class Product extends Model
         'description',
         'price',
         'stock_quantity',
+        'stock_alert_threshold',
         'status',
         'rejection_reason',
         'is_active',
@@ -37,6 +38,7 @@ class Product extends Model
         'reviewed_at' => 'datetime',
         'original_data' => 'array',
         'images_count' => 'integer',
+        'stock_alert_threshold' => 'integer',
     ];
 
     // Relationships
@@ -121,6 +123,52 @@ class Product extends Model
         return !empty($this->original_data);
     }
 
+    // Stock alert methods
+    public function isStockLow()
+    {
+        return $this->stock_quantity <= $this->stock_alert_threshold;
+    }
+
+    public function isOutOfStock()
+    {
+        return $this->stock_quantity == 0;
+    }
+
+    public function getStockStatusAttribute()
+    {
+        if ($this->isOutOfStock()) {
+            return 'out_of_stock';
+        } elseif ($this->isStockLow()) {
+            return 'low_stock';
+        } else {
+            return 'normal';
+        }
+    }
+
+    public function getStockStatusBadgeAttribute()
+    {
+        switch ($this->stock_status) {
+            case 'out_of_stock':
+                return 'danger';
+            case 'low_stock':
+                return 'warning';
+            default:
+                return 'success';
+        }
+    }
+
+    public function getStockStatusTextAttribute()
+    {
+        switch ($this->stock_status) {
+            case 'out_of_stock':
+                return 'Rupture de stock';
+            case 'low_stock':
+                return 'Stock faible';
+            default:
+                return 'Stock normal';
+        }
+    }
+
     public function storeOriginalData()
     {
         $this->original_data = [
@@ -128,6 +176,7 @@ class Product extends Model
             'description' => $this->description,
             'price' => $this->price,
             'stock_quantity' => $this->stock_quantity,
+            'stock_alert_threshold' => $this->stock_alert_threshold,
             'category_id' => $this->category_id,
             'category_name' => $this->category->name ?? 'N/A',
             'images_count' => $this->images_count,

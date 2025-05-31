@@ -167,7 +167,11 @@ Route::middleware(['auth', 'check.role:cooperative_admin'])->prefix('coop')->nam
     Route::delete('/products/{product}', [ProductManagementController::class, 'destroy'])->name('products.destroy');
     Route::get('/products/{product}', [ProductManagementController::class, 'show'])->name('products.show');
 
-    // New AJAX image management routes
+    // NEW: Stock Alert Configuration Routes
+    Route::post('/products/{product}/configure-stock-alert', [ProductManagementController::class, 'configureStockAlert'])->name('products.configure-stock-alert');
+    Route::post('/products/bulk-configure-stock-alerts', [ProductManagementController::class, 'bulkConfigureStockAlerts'])->name('products.bulk-configure-stock-alerts');
+
+    // AJAX image management routes
     Route::post('/products/{product}/manage-images', [ProductManagementController::class, 'manageImages'])->name('products.manage-images');
 });
 

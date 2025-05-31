@@ -1,4 +1,5 @@
 <?php
+// app/Http/Controllers/DashboardController.php
 
 namespace App\Http\Controllers;
 
@@ -95,9 +96,14 @@ class DashboardController extends Controller
                     'draft' => $cooperative->products()->where('status', 'draft')->count(),
                     'rejected' => $cooperative->products()->where('status', 'rejected')->count(),
                     'needs_info' => $cooperative->products()->where('status', 'needs_info')->count(),
+                    // Updated to use custom stock alert thresholds
                     'low_stock' => $cooperative->products()
                         ->where('status', 'approved')
-                        ->where('stock_quantity', '<=', 5)
+                        ->whereRaw('stock_quantity <= stock_alert_threshold')
+                        ->count(),
+                    'out_of_stock' => $cooperative->products()
+                        ->where('status', 'approved')
+                        ->where('stock_quantity', 0)
                         ->count(),
                 ],
                 'revenue' => [
@@ -114,19 +120,28 @@ class DashboardController extends Controller
                 ->take(5)
                 ->get();
 
-            // Get low stock products
+            // Get low stock products using custom thresholds
             $lowStockProducts = $cooperative->products()
                 ->where('status', 'approved')
-                ->where('stock_quantity', '<=', 5)
+                ->whereRaw('stock_quantity <= stock_alert_threshold')
                 ->orderBy('stock_quantity', 'asc')
                 ->take(5)
+                ->get();
+
+            // Get out of stock products
+            $outOfStockProducts = $cooperative->products()
+                ->where('status', 'approved')
+                ->where('stock_quantity', 0)
+                ->orderBy('updated_at', 'desc')
+                ->take(3)
                 ->get();
         } else {
             $recentProducts = collect();
             $lowStockProducts = collect();
+            $outOfStockProducts = collect();
         }
 
-        return view('dashboards.coop', compact('cooperative', 'stats', 'recentProducts', 'lowStockProducts'));
+        return view('dashboards.coop', compact('cooperative', 'stats', 'recentProducts', 'lowStockProducts', 'outOfStockProducts'));
     }
 
     public function clientDashboard()

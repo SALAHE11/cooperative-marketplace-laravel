@@ -12,6 +12,10 @@
                     <h1 class="h3 mb-0">
                         <i class="fas fa-box me-2"></i>
                         {{ $product->name }}
+                        @if($product->isStockLow())
+                            <i class="fas fa-exclamation-triangle text-{{ $product->stock_status_badge }} ms-2"
+                               title="{{ $product->stock_status_text }}"></i>
+                        @endif
                     </h1>
                     <p class="text-muted">
                         Détails du produit - {{ Auth::user()->cooperative->name }}
@@ -32,6 +36,29 @@
             </div>
         </div>
     </div>
+
+    <!-- Stock Alert Status -->
+    @if($product->isStockLow())
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="alert alert-{{ $product->stock_status_badge }}">
+                    <h6>
+                        <i class="fas fa-{{ $product->isOutOfStock() ? 'times-circle' : 'exclamation-triangle' }} me-2"></i>
+                        {{ $product->stock_status_text }}
+                    </h6>
+                    <p class="mb-0">
+                        <strong>Stock actuel:</strong> {{ $product->stock_quantity }} unités •
+                        <strong>Seuil d'alerte:</strong> {{ $product->stock_alert_threshold }} unités
+                        @if($product->isOutOfStock())
+                            • Ce produit est en rupture de stock et n'est plus visible aux clients!
+                        @else
+                            • Il est recommandé de réapprovisionner ce produit.
+                        @endif
+                    </p>
+                </div>
+            </div>
+        </div>
+    @endif
 
     <!-- Status Alert -->
     @if($product->rejection_reason || $product->admin_notes)
@@ -89,11 +116,18 @@
                                     </div>
                                     <div class="info-row">
                                         <span class="info-label">Stock:</span>
-                                        <span class="info-value fw-bold {{ $product->stock_quantity <= 5 ? 'text-danger' : ($product->stock_quantity <= 10 ? 'text-warning' : 'text-success') }}">
+                                        <span class="info-value fw-bold text-{{ $product->stock_status_badge }}">
                                             {{ $product->stock_quantity }}
-                                            @if($product->stock_quantity <= 5)
-                                                <i class="fas fa-exclamation-triangle text-danger ms-1"></i>
+                                            @if($product->isStockLow())
+                                                <i class="fas fa-exclamation-triangle ms-1"></i>
                                             @endif
+                                        </span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">Seuil d'alerte:</span>
+                                        <span class="info-value fw-bold">
+                                            {{ $product->stock_alert_threshold }}
+                                            <small class="text-muted">(alerte si ≤)</small>
                                         </span>
                                     </div>
                                     <div class="info-row">
@@ -225,6 +259,62 @@
 
         <!-- Sidebar -->
         <div class="col-lg-4">
+            <!-- Stock Status Card -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-{{ $product->stock_status_badge }}">
+                        <i class="fas fa-{{ $product->isOutOfStock() ? 'times-circle' : ($product->isStockLow() ? 'exclamation-triangle' : 'check-circle') }} me-2"></i>
+                        État du Stock
+                    </h6>
+                </div>
+                <div class="card-body text-center">
+                    <div class="row mb-3">
+                        <div class="col-6 border-end">
+                            <div class="h4 mb-0 text-{{ $product->stock_status_badge }}">{{ $product->stock_quantity }}</div>
+                            <small class="text-muted">En Stock</small>
+                        </div>
+                        <div class="col-6">
+                            <div class="h5 mb-0 text-warning">{{ $product->stock_alert_threshold }}</div>
+                            <small class="text-muted">Seuil d'Alerte</small>
+                        </div>
+                    </div>
+
+                    <div class="progress mb-3" style="height: 15px;">
+                        @php
+                            $maxStock = max($product->stock_quantity, $product->stock_alert_threshold * 2);
+                            $percentage = $maxStock > 0 ? ($product->stock_quantity / $maxStock) * 100 : 0;
+                            $percentage = min(100, max(5, $percentage)); // Minimum 5% for visibility
+                        @endphp
+                        <div class="progress-bar bg-{{ $product->stock_status_badge }}"
+                             style="width: {{ $percentage }}%">
+                            {{ $product->stock_quantity }}
+                        </div>
+                    </div>
+
+                    <span class="badge bg-{{ $product->stock_status_badge }} fs-6 mb-3">
+                        {{ $product->stock_status_text }}
+                    </span>
+
+                    @if($product->isStockLow())
+                        <div class="alert alert-{{ $product->stock_status_badge }} py-2">
+                            <small>
+                                <i class="fas fa-{{ $product->isOutOfStock() ? 'times-circle' : 'exclamation-triangle' }} me-1"></i>
+                                @if($product->isOutOfStock())
+                                    Produit indisponible pour les clients
+                                @else
+                                    Réapprovisionnement recommandé
+                                @endif
+                            </small>
+                        </div>
+                    @endif
+
+                    <button type="button" class="btn btn-outline-warning btn-sm" onclick="openStockAlertModal()">
+                        <i class="fas fa-cog me-1"></i>
+                        Configurer Seuil
+                    </button>
+                </div>
+            </div>
+
             <!-- Product Status -->
             <div class="card shadow mb-4">
                 <div class="card-header py-3">
@@ -306,6 +396,18 @@
                             </button>
                         @endif
 
+                        @if($product->isStockLow())
+                            <a href="{{ route('coop.products.edit', $product) }}" class="btn btn-warning">
+                                <i class="fas fa-warehouse me-1"></i>
+                                Réapprovisionner
+                            </a>
+                        @endif
+
+                        <button type="button" class="btn btn-outline-warning" onclick="openStockAlertModal()">
+                            <i class="fas fa-bell me-1"></i>
+                            Configurer Alerte Stock
+                        </button>
+
                         <button type="button" class="btn btn-danger" onclick="deleteProduct({{ $product->id }}, '{{ addslashes($product->name) }}', '{{ $product->status }}')">
                             <span class="spinner-border spinner-border-sm me-2 d-none" role="status"></span>
                             <i class="fas fa-trash me-1"></i>
@@ -368,7 +470,77 @@
                             </div>
                         </div>
                     @endif
+
+                    <!-- Stock Alert Progress -->
+                    <hr>
+                    <div class="text-center">
+                        <div class="small text-muted mb-1">Niveau de Stock</div>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar bg-{{ $product->stock_status_badge }}"
+                                 style="width: {{ min(100, max(5, ($product->stock_quantity / max($product->stock_alert_threshold * 3, $product->stock_quantity)) * 100)) }}%"></div>
+                        </div>
+                        <small class="text-{{ $product->stock_status_badge }}">{{ $product->stock_status_text }}</small>
+                    </div>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stock Alert Configuration Modal -->
+<div class="modal fade" id="stockAlertModal" tabindex="-1" aria-labelledby="stockAlertModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="stockAlertModalLabel">
+                    <i class="fas fa-bell me-2"></i>
+                    Configurer Seuil d'Alerte Stock
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <strong>Stock actuel:</strong> {{ $product->stock_quantity }} unités<br>
+                    <strong>Seuil actuel:</strong> {{ $product->stock_alert_threshold }} unités
+                </div>
+
+                <form id="stockAlertForm">
+                    <div class="mb-3">
+                        <label for="stockAlertThreshold" class="form-label">Nouveau Seuil d'Alerte</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="stockAlertThreshold"
+                                   min="0" max="1000" value="{{ $product->stock_alert_threshold }}" required>
+                            <span class="input-group-text">unités</span>
+                        </div>
+                        <div class="form-text">
+                            Vous serez alerté quand le stock descend à ce niveau ou en dessous.
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Suggestions</label>
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setThreshold(5)">
+                                5 unités (Standard)
+                            </button>
+                            <button type="button" class="btn btn-outline-warning btn-sm" onclick="setThreshold(10)">
+                                10 unités (Produits populaires)
+                            </button>
+                            @if($product->stock_quantity > 10)
+                                <button type="button" class="btn btn-outline-info btn-sm" onclick="setThreshold({{ Math.floor($product->stock_quantity * 0.1) }})">
+                                    {{ Math.floor($product->stock_quantity * 0.1) }} unités (10% du stock actuel)
+                                </button>
+                            @endif
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-warning" onclick="saveStockAlert()">
+                    <i class="fas fa-save me-1"></i>
+                    Sauvegarder
+                </button>
             </div>
         </div>
     </div>
@@ -660,6 +832,14 @@
     object-fit: cover;
 }
 
+.progress {
+    background-color: #e9ecef;
+}
+
+.progress-bar {
+    transition: width 0.3s ease;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .info-row {
@@ -692,12 +872,60 @@
 @push('scripts')
 <script>
 let imageGalleryModal = null;
+let stockAlertModal = null;
 let currentImageIndex = 0;
 let galleryImages = [];
 
 document.addEventListener('DOMContentLoaded', function() {
     imageGalleryModal = new bootstrap.Modal(document.getElementById('imageGalleryModal'));
+    stockAlertModal = new bootstrap.Modal(document.getElementById('stockAlertModal'));
 });
+
+// Stock Alert Configuration Functions
+function openStockAlertModal() {
+    stockAlertModal.show();
+}
+
+function setThreshold(value) {
+    document.getElementById('stockAlertThreshold').value = value;
+}
+
+function saveStockAlert() {
+    const threshold = document.getElementById('stockAlertThreshold').value;
+
+    if (!threshold || threshold < 0 || threshold > 1000) {
+        showAlert('Seuil d\'alerte invalide (0-1000)', 'danger');
+        return;
+    }
+
+    fetch(`{{ route('coop.products.configure-stock-alert', $product) }}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+        },
+        body: JSON.stringify({
+            stock_alert_threshold: parseInt(threshold)
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert(data.message, 'success');
+            stockAlertModal.hide();
+            // Reload page to update display
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showAlert(data.message, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('Erreur de connexion au serveur', 'danger');
+    });
+}
 
 // Enhanced Image Gallery Functions
 function openImageGallery(startIndex = 0) {

@@ -46,6 +46,29 @@
         </div>
     @endif
 
+    <!-- Stock Alert Status -->
+    @if($product->isStockLow())
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="alert alert-{{ $product->isOutOfStock() ? 'danger' : 'warning' }}">
+                    <h6>
+                        <i class="fas fa-{{ $product->isOutOfStock() ? 'times-circle' : 'exclamation-triangle' }} me-2"></i>
+                        {{ $product->stock_status_text }}
+                    </h6>
+                    <p class="mb-0">
+                        Stock actuel: <strong>{{ $product->stock_quantity }}</strong> •
+                        Seuil d'alerte: <strong>{{ $product->stock_alert_threshold }}</strong>
+                        @if($product->isOutOfStock())
+                            • Ce produit est en rupture de stock!
+                        @else
+                            • Ce produit nécessite un réapprovisionnement.
+                        @endif
+                    </p>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <!-- Product Form -->
     <div class="row">
         <div class="col-lg-8">
@@ -102,9 +125,9 @@
                             </div>
                         </div>
 
-                        <!-- Price and Stock Row -->
+                        <!-- Price, Stock and Alert Threshold Row -->
                         <div class="row">
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <div class="mb-3">
                                     <label for="price" class="form-label">
                                         <i class="fas fa-coins me-1"></i>
@@ -119,15 +142,41 @@
                                     <div class="invalid-feedback" id="price_error"></div>
                                 </div>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <div class="mb-3">
                                     <label for="stock_quantity" class="form-label">
                                         <i class="fas fa-warehouse me-1"></i>
                                         Quantité en Stock *
+                                        @if($product->isStockLow())
+                                            <i class="fas fa-exclamation-triangle text-{{ $product->stock_status_badge }} ms-1"></i>
+                                        @endif
                                     </label>
-                                    <input type="number" class="form-control" id="stock_quantity" name="stock_quantity"
+                                    <input type="number" class="form-control {{ $product->isStockLow() ? 'border-' . $product->stock_status_badge : '' }}"
+                                           id="stock_quantity" name="stock_quantity"
                                            min="0" required value="{{ $product->stock_quantity }}" placeholder="0">
                                     <div class="invalid-feedback" id="stock_quantity_error"></div>
+                                    @if($product->isStockLow())
+                                        <div class="form-text text-{{ $product->stock_status_badge }}">
+                                            {{ $product->stock_status_text }} (Seuil: {{ $product->stock_alert_threshold }})
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="stock_alert_threshold" class="form-label">
+                                        <i class="fas fa-bell me-1"></i>
+                                        Seuil d'Alerte Stock *
+                                    </label>
+                                    <input type="number" class="form-control" id="stock_alert_threshold" name="stock_alert_threshold"
+                                           min="0" max="1000" value="{{ $product->stock_alert_threshold }}" required placeholder="5">
+                                    <div class="invalid-feedback" id="stock_alert_threshold_error"></div>
+                                    <div class="form-text">
+                                        Alerte si stock ≤ cette valeur
+                                        <button type="button" class="btn btn-link btn-sm p-0 ms-2" onclick="showStockAlertInfo()">
+                                            <i class="fas fa-question-circle"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -236,7 +285,66 @@
                             @if($product->needsInfo())
                                 <li><strong>Informations demandées:</strong> Veuillez répondre aux questions de l'administrateur</li>
                             @endif
+                            @if($product->isApproved())
+                                <li><strong>Produit approuvé:</strong> Seuls les changements de stock et seuil d'alerte ne nécessitent pas de ré-approbation</li>
+                            @endif
                         </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stock Alert Configuration Card -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-warning">
+                        <i class="fas fa-bell me-2"></i>
+                        Configuration Alerte Stock
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center mb-3">
+                        <div class="col-6">
+                            <div class="border-end">
+                                <div class="h5 mb-0 text-{{ $product->stock_status_badge }}">{{ $product->stock_quantity }}</div>
+                                <small class="text-muted">Stock Actuel</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="h5 mb-0 text-warning">{{ $product->stock_alert_threshold }}</div>
+                            <small class="text-muted">Seuil d'Alerte</small>
+                        </div>
+                    </div>
+
+                    <div class="progress mb-3" style="height: 10px;">
+                        @php
+                            $percentage = $product->stock_alert_threshold > 0 ? ($product->stock_quantity / max($product->stock_alert_threshold * 2, $product->stock_quantity)) * 100 : 100;
+                            $percentage = min(100, $percentage);
+                        @endphp
+                        <div class="progress-bar bg-{{ $product->stock_status_badge }}"
+                             style="width: {{ $percentage }}%"></div>
+                    </div>
+
+                    @if($product->isStockLow())
+                        <div class="alert alert-{{ $product->stock_status_badge }} py-2">
+                            <small>
+                                <i class="fas fa-{{ $product->isOutOfStock() ? 'times-circle' : 'exclamation-triangle' }} me-1"></i>
+                                {{ $product->stock_status_text }}
+                            </small>
+                        </div>
+                    @endif
+
+                    <div class="small text-muted">
+                        <p><strong>Fonctionnement:</strong></p>
+                        <ul class="mb-2">
+                            <li>Alerte quand stock ≤ seuil</li>
+                            <li>Visible dans le tableau de bord</li>
+                            <li>Modifiable à tout moment</li>
+                        </ul>
+
+                        <button type="button" class="btn btn-outline-warning btn-sm w-100" onclick="showStockAlertModal()">
+                            <i class="fas fa-cog me-1"></i>
+                            Configuration Rapide
+                        </button>
                     </div>
                 </div>
             </div>
@@ -268,6 +376,116 @@
                         @endif
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stock Alert Quick Configuration Modal -->
+<div class="modal fade" id="stockAlertQuickModal" tabindex="-1" aria-labelledby="stockAlertQuickModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="stockAlertQuickModalLabel">
+                    <i class="fas fa-bell me-2"></i>
+                    Configuration Rapide - Seuil d'Alerte
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Seuils Suggérés</label>
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-outline-secondary" onclick="setQuickThreshold(5)">
+                            <i class="fas fa-star me-1"></i>
+                            5 unités (Recommandé pour la plupart des produits)
+                        </button>
+                        <button type="button" class="btn btn-outline-warning" onclick="setQuickThreshold(10)">
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            10 unités (Produits populaires)
+                        </button>
+                        <button type="button" class="btn btn-outline-info" onclick="setQuickThreshold(Math.max(5, Math.floor({{ $product->stock_quantity }} * 0.1)))">
+                            <i class="fas fa-percentage me-1"></i>
+                            {{ Math.max(5, Math.floor($product->stock_quantity * 0.1)) }} unités (10% du stock actuel)
+                        </button>
+                        <button type="button" class="btn btn-outline-danger" onclick="setQuickThreshold(1)">
+                            <i class="fas fa-times-circle me-1"></i>
+                            1 unité (Alerte de dernière minute)
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="customThreshold" class="form-label">Ou définir un seuil personnalisé</label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" id="customThreshold"
+                               min="0" max="1000" value="{{ $product->stock_alert_threshold }}">
+                        <span class="input-group-text">unités</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-warning" onclick="applyQuickThreshold()">
+                    <i class="fas fa-check me-1"></i>
+                    Appliquer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stock Alert Info Modal -->
+<div class="modal fade" id="stockAlertInfoModal" tabindex="-1" aria-labelledby="stockAlertInfoModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="stockAlertInfoModalLabel">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Comment fonctionnent les Alertes Stock
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <h6>Principe</h6>
+                    <p class="mb-0">Vous recevez une alerte quand le stock atteint ou descend en dessous du seuil configuré.</p>
+                </div>
+
+                <h6>Exemples pratiques:</h6>
+                <ul>
+                    <li><strong>Seuil à 5:</strong> Alerte quand il reste 5 unités ou moins</li>
+                    <li><strong>Seuil à 10:</strong> Alerte quand il reste 10 unités ou moins</li>
+                    <li><strong>Seuil à 0:</strong> Alerte uniquement en rupture de stock</li>
+                </ul>
+
+                <h6>Recommandations:</h6>
+                <div class="row">
+                    <div class="col-6">
+                        <div class="card bg-light">
+                            <div class="card-body py-2">
+                                <h6 class="card-title text-success">Produits lents</h6>
+                                <p class="card-text small">Seuil: 1-5 unités</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="card bg-light">
+                            <div class="card-body py-2">
+                                <h6 class="card-title text-warning">Produits populaires</h6>
+                                <p class="card-text small">Seuil: 10-20 unités</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-warning mt-3">
+                    <h6>Important</h6>
+                    <p class="mb-0">Ajustez le seuil selon votre fréquence de réapprovisionnement et la popularité du produit.</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Compris</button>
             </div>
         </div>
     </div>
@@ -367,6 +585,32 @@
 .current-image:hover img {
     transform: scale(1.05);
 }
+
+/* Stock alert specific styling */
+.border-warning {
+    border-color: #ffc107 !important;
+}
+
+.border-danger {
+    border-color: #dc3545 !important;
+}
+
+#stock_alert_threshold {
+    border-left: 3px solid #ffc107;
+}
+
+#stock_alert_threshold:focus {
+    border-left-color: #ff8f00;
+    box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25);
+}
+
+.progress {
+    background-color: #e9ecef;
+}
+
+.progress-bar {
+    transition: width 0.3s ease;
+}
 </style>
 @endpush
 
@@ -377,6 +621,10 @@ document.addEventListener('DOMContentLoaded', function() {
     let removedImageIds = [];
     let primaryImageId = {{ $product->primary_image_id ?? 'null' }};
 
+    // Initialize modals
+    const stockAlertQuickModal = new bootstrap.Modal(document.getElementById('stockAlertQuickModal'));
+    const stockAlertInfoModal = new bootstrap.Modal(document.getElementById('stockAlertInfoModal'));
+
     // Character counter for description
     const descriptionTextarea = document.getElementById('description');
     const descriptionCount = document.getElementById('description_count');
@@ -384,6 +632,29 @@ document.addEventListener('DOMContentLoaded', function() {
     descriptionTextarea.addEventListener('input', function() {
         descriptionCount.textContent = this.value.length;
     });
+
+    // Stock alert threshold and quantity validation
+    const stockQuantityInput = document.getElementById('stock_quantity');
+    const stockAlertInput = document.getElementById('stock_alert_threshold');
+
+    stockQuantityInput.addEventListener('input', updateStockStatus);
+    stockAlertInput.addEventListener('input', updateStockStatus);
+
+    function updateStockStatus() {
+        const stockQuantity = parseInt(stockQuantityInput.value) || 0;
+        const alertThreshold = parseInt(stockAlertInput.value) || 0;
+
+        // Update visual indicators
+        stockQuantityInput.classList.remove('border-warning', 'border-danger', 'border-success');
+
+        if (stockQuantity === 0) {
+            stockQuantityInput.classList.add('border-danger');
+        } else if (stockQuantity <= alertThreshold) {
+            stockQuantityInput.classList.add('border-warning');
+        } else {
+            stockQuantityInput.classList.add('border-success');
+        }
+    }
 
     // File input change handler
     document.getElementById('new_images').addEventListener('change', function(e) {
@@ -568,6 +839,16 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        // Additional validation for stock alert threshold
+        const stockQuantity = parseInt(document.getElementById('stock_quantity').value) || 0;
+        const stockAlertThreshold = parseInt(document.getElementById('stock_alert_threshold').value) || 0;
+
+        if (stockAlertThreshold > stockQuantity && stockQuantity > 0) {
+            showError('Le seuil d\'alerte ne peut pas être supérieur à la quantité en stock.');
+            document.getElementById('stock_alert_threshold').classList.add('is-invalid');
+            return;
+        }
+
         const formData = new FormData();
         const form = document.getElementById('productForm');
 
@@ -637,6 +918,27 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Stock Alert Modal Functions
+    window.showStockAlertModal = function() {
+        stockAlertQuickModal.show();
+    };
+
+    window.showStockAlertInfo = function() {
+        stockAlertInfoModal.show();
+    };
+
+    window.setQuickThreshold = function(threshold) {
+        document.getElementById('customThreshold').value = threshold;
+    };
+
+    window.applyQuickThreshold = function() {
+        const threshold = document.getElementById('customThreshold').value;
+        document.getElementById('stock_alert_threshold').value = threshold;
+        updateStockStatus();
+        stockAlertQuickModal.hide();
+        showSuccess(`Seuil d'alerte défini à ${threshold} unités`);
+    };
+
     function clearErrors() {
         document.querySelectorAll('.is-invalid').forEach(element => {
             element.classList.remove('is-invalid');
@@ -703,6 +1005,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }, 5000);
     }
+
+    // Initialize stock status on page load
+    updateStockStatus();
 });
 </script>
 @endpush
