@@ -22,8 +22,13 @@ class ImageProcessingService
             $extension = $uploadedFile->getClientOriginalExtension();
             $filename = $uuid . '.' . $extension;
 
+            // FIXED: Use proper directory without 'public/' prefix
             $directory = 'products/' . $productId;
-            Storage::makeDirectory('public/' . $directory);
+
+            // Create directory in public disk
+            if (!Storage::disk('public')->exists($directory)) {
+                Storage::disk('public')->makeDirectory($directory);
+            }
 
             $originalPath = $directory . '/original_' . $filename;
             $thumbnailPath = $directory . '/thumb_' . $filename;
@@ -63,8 +68,8 @@ class ImageProcessingService
                 'alt_text' => "Image produit " . ($sortOrder + 1),
             ]);
 
-            // Store original file
-            $uploadedFile->storeAs('public/' . $directory, 'original_' . $filename);
+            // FIXED: Store using public disk with correct parameters
+            $uploadedFile->storeAs($directory, 'original_' . $filename, 'public');
 
             // Try advanced image processing with Intervention Image
             $processed = self::processWithInterventionImage($uploadedFile, $originalPath, $thumbnailPath);
@@ -119,14 +124,20 @@ class ImageProcessingService
                 $constraint->aspectRatio();
                 $constraint->upsize();
             });
-            $thumb->save(storage_path('app/public/' . $thumbnailPath), 85);
+
+            // FIXED: Save to public disk using Storage facade
+            $thumbContents = $thumb->encode('jpg', 85)->__toString();
+            Storage::disk('public')->put($thumbnailPath, $thumbContents);
 
             // Optimize original (max 1200px width)
             $img->resize(1200, null, function ($constraint) {
                 $constraint->aspectRatio();
                 $constraint->upsize();
             });
-            $img->save(storage_path('app/public/' . $originalPath), 85);
+
+            // FIXED: Save to public disk using Storage facade
+            $imgContents = $img->encode('jpg', 85)->__toString();
+            Storage::disk('public')->put($originalPath, $imgContents);
 
             return true;
 
@@ -211,21 +222,25 @@ class ImageProcessingService
 
             imagecopyresampled($thumb, $source, 0, 0, 0, 0, $thumbWidth, $thumbHeight, $width, $height);
 
-            // Save thumbnail
-            $thumbPath = storage_path('app/public/' . $thumbnailPath);
+            // FIXED: Save thumbnail using Storage facade
+            ob_start();
             switch ($type) {
                 case IMAGETYPE_JPEG:
-                    imagejpeg($thumb, $thumbPath, 85);
+                    imagejpeg($thumb, null, 85);
                     break;
                 case IMAGETYPE_PNG:
-                    imagepng($thumb, $thumbPath, 8);
+                    imagepng($thumb, null, 8);
                     break;
                 case IMAGETYPE_WEBP:
                     if (function_exists('imagewebp')) {
-                        imagewebp($thumb, $thumbPath, 85);
+                        imagewebp($thumb, null, 85);
                     }
                     break;
             }
+            $thumbContents = ob_get_contents();
+            ob_end_clean();
+
+            Storage::disk('public')->put($thumbnailPath, $thumbContents);
 
             // Optimize original if needed
             if ($width > 1200) {
@@ -243,23 +258,31 @@ class ImageProcessingService
 
                 imagecopyresampled($optimized, $source, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
 
-                // Save optimized original
-                $originalFilePath = storage_path('app/public/' . $originalPath);
+                // FIXED: Save optimized original using Storage facade
+                ob_start();
                 switch ($type) {
                     case IMAGETYPE_JPEG:
-                        imagejpeg($optimized, $originalFilePath, 85);
+                        imagejpeg($optimized, null, 85);
                         break;
                     case IMAGETYPE_PNG:
-                        imagepng($optimized, $originalFilePath, 8);
+                        imagepng($optimized, null, 8);
                         break;
                     case IMAGETYPE_WEBP:
                         if (function_exists('imagewebp')) {
-                            imagewebp($optimized, $originalFilePath, 85);
+                            imagewebp($optimized, null, 85);
                         }
                         break;
                 }
+                $optimizedContents = ob_get_contents();
+                ob_end_clean();
+
+                Storage::disk('public')->put($originalPath, $optimizedContents);
 
                 imagedestroy($optimized);
+            } else {
+                // Just copy the original file
+                $originalContents = file_get_contents($uploadedFile->path());
+                Storage::disk('public')->put($originalPath, $originalContents);
             }
 
             // Clean up memory
@@ -282,11 +305,10 @@ class ImageProcessingService
     private static function copyAsThumb($originalPath, $thumbnailPath)
     {
         try {
-            $originalFilePath = storage_path('app/public/' . $originalPath);
-            $thumbFilePath = storage_path('app/public/' . $thumbnailPath);
-
-            if (file_exists($originalFilePath)) {
-                copy($originalFilePath, $thumbFilePath);
+            // FIXED: Use Storage facade to copy within public disk
+            if (Storage::disk('public')->exists($originalPath)) {
+                $contents = Storage::disk('public')->get($originalPath);
+                Storage::disk('public')->put($thumbnailPath, $contents);
                 return true;
             }
 
@@ -347,15 +369,28 @@ class ImageProcessingService
 
         foreach ($failedImages as $image) {
             try {
-                $originalPath = storage_path('app/public/' . $image->image_path);
-
-                if (!file_exists($originalPath)) {
-                    throw new \Exception('Original file not found');
+                // FIXED: Check if file exists in public disk
+                if (!Storage::disk('public')->exists($image->image_path)) {
+                    throw new \Exception('Original file not found in public storage');
                 }
+
+                // Get the file contents and try to reprocess
+                $fileContents = Storage::disk('public')->get($image->image_path);
+                $tempPath = tempnam(sys_get_temp_dir(), 'reprocess_');
+                file_put_contents($tempPath, $fileContents);
+
+                // Create a temporary UploadedFile-like object
+                $tempFile = new \Illuminate\Http\UploadedFile(
+                    $tempPath,
+                    $image->original_filename ?? 'reprocess.jpg',
+                    $image->mime_type ?? 'image/jpeg',
+                    null,
+                    true
+                );
 
                 // Try to reprocess
                 $processed = self::processWithBasicPHP(
-                    new \Illuminate\Http\UploadedFile($originalPath, $image->original_filename),
+                    $tempFile,
                     $image->image_path,
                     $image->thumbnail_path
                 );
@@ -366,6 +401,9 @@ class ImageProcessingService
 
                 $image->markAsReady();
                 $results['processed']++;
+
+                // Clean up temp file
+                unlink($tempPath);
 
             } catch (\Exception $e) {
                 $image->markAsFailed($e->getMessage());
@@ -463,7 +501,11 @@ class ImageProcessingService
             'supported_formats' => self::getSupportedFormats(),
             'max_upload_size' => ini_get('upload_max_filesize'),
             'max_post_size' => ini_get('post_max_size'),
-            'memory_limit' => ini_get('memory_limit')
+            'memory_limit' => ini_get('memory_limit'),
+            'storage_disk_config' => config('filesystems.disks.public'),
+            'storage_link_exists' => is_link(public_path('storage')),
+            'public_storage_path' => storage_path('app/public'),
+            'public_storage_writable' => is_writable(storage_path('app/public'))
         ];
     }
 
@@ -481,7 +523,7 @@ class ImageProcessingService
                 $formats[] = 'png';
             }
 
-            if (function_exists('imagewebp') && $gdInfo['WebP Support']) {
+            if (function_exists('imagewebp') && isset($gdInfo['WebP Support']) && $gdInfo['WebP Support']) {
                 $formats[] = 'webp';
             }
         }
@@ -530,5 +572,43 @@ class ImageProcessingService
         }
 
         return $errors;
+    }
+
+    /**
+     * Test image storage and retrieval
+     */
+    public static function testImageStorage()
+    {
+        try {
+            $testContent = 'test image content';
+            $testPath = 'test/test-image.txt';
+
+            // Test writing
+            Storage::disk('public')->put($testPath, $testContent);
+
+            // Test reading
+            $retrievedContent = Storage::disk('public')->get($testPath);
+
+            // Test URL generation
+            $url = Storage::url($testPath);
+
+            // Clean up
+            Storage::disk('public')->delete($testPath);
+            Storage::disk('public')->deleteDirectory('test');
+
+            return [
+                'success' => true,
+                'can_write' => true,
+                'can_read' => $retrievedContent === $testContent,
+                'can_generate_url' => !empty($url),
+                'test_url' => $url
+            ];
+
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
+        }
     }
 }

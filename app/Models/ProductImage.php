@@ -7,7 +7,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
-
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Log;
 class ProductImage extends Model
 {
     use HasFactory, SoftDeletes;
@@ -45,62 +46,129 @@ class ProductImage extends Model
         return $this->belongsTo(Product::class);
     }
 
-    // Status methods
+    // Status methods with fallback for missing column
     public function isPending()
     {
+        if (!$this->hasProcessingStatusColumn()) {
+            return false; // Assume ready if column doesn't exist
+        }
         return $this->processing_status === 'pending';
     }
 
     public function isProcessing()
     {
+        if (!$this->hasProcessingStatusColumn()) {
+            return false;
+        }
         return $this->processing_status === 'processing';
     }
 
     public function isReady()
     {
+        if (!$this->hasProcessingStatusColumn()) {
+            // If column doesn't exist, check if file exists
+            return $this->image_path && Storage::disk('public')->exists($this->image_path);
+        }
         return $this->processing_status === 'ready';
     }
 
     public function isFailed()
     {
+        if (!$this->hasProcessingStatusColumn()) {
+            return false;
+        }
         return $this->processing_status === 'failed';
     }
 
     public function markAsProcessing()
     {
-        $this->update(['processing_status' => 'processing']);
+        if ($this->hasProcessingStatusColumn()) {
+            $this->update(['processing_status' => 'processing']);
+        }
     }
 
     public function markAsReady()
     {
-        $this->update([
-            'processing_status' => 'ready',
-            'failure_reason' => null
-        ]);
+        if ($this->hasProcessingStatusColumn()) {
+            $this->update([
+                'processing_status' => 'ready',
+                'failure_reason' => null
+            ]);
+        }
     }
 
     public function markAsFailed($reason = null)
     {
-        $this->update([
-            'processing_status' => 'failed',
-            'failure_reason' => $reason
-        ]);
+        if ($this->hasProcessingStatusColumn()) {
+            $this->update([
+                'processing_status' => 'failed',
+                'failure_reason' => $reason
+            ]);
+        }
     }
 
-    // URL getters
+    // Check if processing_status column exists
+    private function hasProcessingStatusColumn()
+    {
+        static $hasColumn = null;
+
+        if ($hasColumn === null) {
+            try {
+                $hasColumn = Schema::hasColumn($this->getTable(), 'processing_status');
+            } catch (\Exception $e) {
+                $hasColumn = false;
+            }
+        }
+
+        return $hasColumn;
+    }
+
+    // URL getters with better error handling
     public function getImageUrlAttribute()
     {
-        if ($this->image_path && Storage::disk('public')->exists($this->image_path)) {
-            return Storage::url($this->image_path);
+        if (!$this->image_path) {
+            return null;
         }
-        return null;
+
+        // Check if file exists
+        if (!Storage::disk('public')->exists($this->image_path)) {
+            Log::warning('Image file not found', [
+                'image_id' => $this->id,
+                'path' => $this->image_path,
+                'full_path' => storage_path('app/public/' . $this->image_path)
+            ]);
+            return null;
+        }
+
+        try {
+            // Use Storage::url() for public disk files
+            return Storage::url($this->image_path);
+        } catch (\Exception $e) {
+            Log::error('Failed to generate image URL', [
+                'image_id' => $this->id,
+                'path' => $this->image_path,
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
     }
 
     public function getThumbnailUrlAttribute()
     {
         if ($this->thumbnail_path && Storage::disk('public')->exists($this->thumbnail_path)) {
-            return Storage::url($this->thumbnail_path);
+            try {
+                return Storage::url($this->thumbnail_path);
+            } catch (\Exception $e) {
+
+            Log::warning('Failed to generate thumbnail URL, falling back to main image', [
+                    'image_id' => $this->id,
+                    'thumbnail_path' => $this->thumbnail_path,
+                    'error' => $e->getMessage()
+                ]);
+            }
         }
+
+        // Fallback to main image
         return $this->image_url;
     }
 
