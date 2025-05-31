@@ -1,4 +1,5 @@
 <?php
+// app/Http/Controllers/Admin/ProductRequestManagementController.php
 
 namespace App\Http\Controllers\Admin;
 
@@ -19,16 +20,13 @@ class ProductRequestManagementController extends Controller
         $this->middleware('check.role:system_admin');
     }
 
-    /**
-     * Display product requests management page
-     */
     public function index(Request $request)
     {
         $status = $request->get('status', 'pending');
         $search = $request->get('search');
         $cooperative = $request->get('cooperative');
 
-        $query = Product::with(['cooperative', 'category', 'images', 'reviewedBy'])
+        $query = Product::with(['cooperative', 'category', 'primaryImage', 'reviewedBy'])
                        ->whereIn('status', ['pending', 'approved', 'rejected', 'needs_info']);
 
         if ($status !== 'all') {
@@ -51,7 +49,6 @@ class ProductRequestManagementController extends Controller
 
         $products = $query->orderBy('submitted_at', 'desc')->paginate(12);
 
-        // Get counts for badges
         $counts = [
             'all' => Product::whereIn('status', ['pending', 'approved', 'rejected', 'needs_info'])->count(),
             'pending' => Product::where('status', 'pending')->count(),
@@ -60,36 +57,66 @@ class ProductRequestManagementController extends Controller
             'needs_info' => Product::where('status', 'needs_info')->count(),
         ];
 
-        // Get cooperatives for filter
         $cooperatives = \App\Models\Cooperative::where('status', 'approved')->orderBy('name')->get();
 
         return view('admin.product-requests.index', compact('products', 'counts', 'status', 'search', 'cooperative', 'cooperatives'));
     }
 
-    /**
-     * Show product request details
-     */
     public function show(Product $product)
     {
         if (!in_array($product->status, ['pending', 'approved', 'rejected', 'needs_info'])) {
             abort(404, 'Demande de produit non trouvée.');
         }
 
-        $product->load(['cooperative', 'category', 'images', 'reviewedBy']);
+        $product->load(['cooperative', 'category', 'images', 'reviewedBy', 'primaryImage']);
 
         return view('admin.product-requests.show', compact('product'));
     }
 
-   
+    public function approve(Request $request, Product $product)
+    {
+        $request->validate([
+            'admin_notes' => 'nullable|string|max:2000'
+        ]);
 
-    /**
-     * Reject product request
-     */
+        try {
+            DB::beginTransaction();
+
+            $product->update([
+                'status' => 'approved',
+                'admin_notes' => $request->admin_notes,
+                'reviewed_at' => now(),
+                'reviewed_by' => Auth::id(),
+                'rejection_reason' => null,
+                'original_data' => null, // Clear version tracking
+            ]);
+
+            $this->sendApprovalEmail($product, $request->admin_notes);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Produit approuvé avec succès!'
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Product approval error', [
+                'error' => $e->getMessage(),
+                'product_id' => $product->id,
+                'admin_id' => Auth::id()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de l\'approbation du produit.'
+            ], 500);
+        }
+    }
+
     public function reject(Request $request, Product $product)
     {
-        /** @var User $user */
-        $user = Auth::user();
-
         if ($product->status !== 'pending' && $product->status !== 'needs_info') {
             return response()->json([
                 'success' => false,
@@ -101,19 +128,18 @@ class ProductRequestManagementController extends Controller
             'rejection_reason' => 'required|string|min:10|max:1000'
         ]);
 
-        DB::beginTransaction();
-
         try {
+            DB::beginTransaction();
+
             $product->update([
                 'status' => 'rejected',
                 'is_active' => false,
                 'reviewed_at' => now(),
-                'reviewed_by' => $user->id,
+                'reviewed_by' => Auth::id(),
                 'rejection_reason' => $request->rejection_reason,
                 'admin_notes' => $request->admin_notes,
             ]);
 
-            // Send rejection email
             $this->sendRejectionEmail($product, $request->rejection_reason);
 
             DB::commit();
@@ -124,11 +150,11 @@ class ProductRequestManagementController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            DB::rollback();
+            DB::rollBack();
             Log::error('Error rejecting product', [
                 'product_id' => $product->id,
                 'error' => $e->getMessage(),
-                'user_id' => $user->id
+                'user_id' => Auth::id()
             ]);
 
             return response()->json([
@@ -138,14 +164,8 @@ class ProductRequestManagementController extends Controller
         }
     }
 
-    /**
-     * Request more information about product
-     */
     public function requestInfo(Request $request, Product $product)
     {
-        /** @var User $user */
-        $user = Auth::user();
-
         if ($product->status !== 'pending') {
             return response()->json([
                 'success' => false,
@@ -157,17 +177,16 @@ class ProductRequestManagementController extends Controller
             'info_requested' => 'required|string|min:10|max:1000'
         ]);
 
-        DB::beginTransaction();
-
         try {
+            DB::beginTransaction();
+
             $product->update([
                 'status' => 'needs_info',
                 'reviewed_at' => now(),
-                'reviewed_by' => $user->id,
+                'reviewed_by' => Auth::id(),
                 'admin_notes' => $request->info_requested,
             ]);
 
-            // Send info request email
             $this->sendInfoRequestEmail($product, $request->info_requested);
 
             DB::commit();
@@ -178,11 +197,11 @@ class ProductRequestManagementController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            DB::rollback();
+            DB::rollBack();
             Log::error('Error requesting product info', [
                 'product_id' => $product->id,
                 'error' => $e->getMessage(),
-                'user_id' => $user->id
+                'user_id' => Auth::id()
             ]);
 
             return response()->json([
@@ -192,18 +211,18 @@ class ProductRequestManagementController extends Controller
         }
     }
 
-    /**
-     * Get product images for modal display
-     */
     public function getImages(Product $product)
     {
-        $images = $product->images()->orderBy('sort_order')->get()->map(function($image) {
+        $images = $product->images()->orderBy('sort_order')->get()->map(function($image) use ($product) {
             return [
                 'id' => $image->id,
                 'url' => $image->image_url,
                 'thumbnail' => $image->thumbnail_url,
-                'is_primary' => $image->is_primary,
+                'is_primary' => $product->primary_image_id === $image->id,
                 'alt_text' => $image->alt_text,
+                'file_size' => $image->formatted_file_size,
+                'dimensions' => $image->dimensions,
+                'processing_status' => $image->processing_status,
             ];
         });
 
@@ -213,9 +232,6 @@ class ProductRequestManagementController extends Controller
         ]);
     }
 
-    /**
-     * Send product approval email
-     */
     private function sendApprovalEmail(Product $product, $adminNotes = null)
     {
         $cooperative = $product->cooperative;
@@ -259,9 +275,6 @@ class ProductRequestManagementController extends Controller
         }
     }
 
-    /**
-     * Send product rejection email
-     */
     private function sendRejectionEmail(Product $product, $rejectionReason)
     {
         $cooperative = $product->cooperative;
@@ -300,9 +313,6 @@ class ProductRequestManagementController extends Controller
         }
     }
 
-    /**
-     * Send info request email
-     */
     private function sendInfoRequestEmail(Product $product, $infoRequested)
     {
         $cooperative = $product->cooperative;
@@ -339,46 +349,4 @@ class ProductRequestManagementController extends Controller
             EmailService::sendNotificationEmail($email, $subject, $message);
         }
     }
-
-    public function approve(Request $request, Product $product)
-{
-    $request->validate([
-        'admin_notes' => 'nullable|string|max:2000'
-    ]);
-
-    try {
-        DB::beginTransaction();
-
-        $product->status = 'approved';
-        $product->admin_notes = $request->admin_notes;
-        $product->reviewed_at = now();
-        $product->reviewed_by = Auth::id();
-        $product->rejection_reason = null;
-
-        // NEW: Clear original_data when product is approved
-        $product->original_data = null;
-
-        $product->save();
-
-        DB::commit();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Produit approuvé avec succès!'
-        ]);
-
-    } catch (\Exception $e) {
-        DB::rollBack();
-        Log::error('Product approval error', [
-            'error' => $e->getMessage(),
-            'product_id' => $product->id,
-            'admin_id' => Auth::id()
-        ]);
-
-        return response()->json([
-            'success' => false,
-            'message' => 'Erreur lors de l\'approbation du produit.'
-        ], 500);
-    }
-}
 }

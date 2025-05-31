@@ -132,24 +132,36 @@
                             </div>
                         </div>
 
-                        <!-- Current Images -->
+                        <!-- Enhanced Current Images Management -->
                         <div class="mb-4">
                             <label class="form-label">
                                 <i class="fas fa-images me-1"></i>
-                                Images Actuelles
+                                Images Actuelles ({{ $product->images_count }})
                             </label>
 
                             <div id="currentImagesContainer" class="row">
                                 @foreach($product->images as $image)
                                     <div class="col-md-6 col-lg-4 mb-3" data-image-id="{{ $image->id }}">
                                         <div class="image-preview current-image">
-                                            <img src="{{ $image->image_url }}" alt="Image produit">
-                                            @if($image->is_primary)
+                                            <img src="{{ $image->thumbnail_url ?: $image->image_url }}" alt="Image produit">
+                                            @if($product->primary_image_id === $image->id)
                                                 <div class="primary-badge">Principal</div>
                                             @endif
-                                            <button type="button" class="remove-image" onclick="removeCurrentImage({{ $image->id }})">
-                                                <i class="fas fa-times"></i>
-                                            </button>
+                                            <div class="image-controls">
+                                                <button type="button" class="btn btn-sm btn-warning set-primary-btn"
+                                                        data-image-id="{{ $image->id }}"
+                                                        @if($product->primary_image_id === $image->id) style="display:none;" @endif
+                                                        onclick="setPrimaryImage({{ $image->id }})">
+                                                    <i class="fas fa-star"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-danger remove-current-image"
+                                                        onclick="removeCurrentImage({{ $image->id }})">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </div>
+                                            <div class="image-info">
+                                                <small>{{ $image->formatted_file_size }} • {{ $image->dimensions }}</small>
+                                            </div>
                                         </div>
                                     </div>
                                 @endforeach
@@ -170,6 +182,7 @@
                                 <div class="invalid-feedback" id="new_images_error"></div>
                                 <div class="form-text">
                                     Formats acceptés: JPEG, PNG, JPG, WEBP. Taille max: 2MB par image.
+                                    <br>Maximum 5 images au total (actuelles + nouvelles).
                                 </div>
                             </div>
 
@@ -179,8 +192,9 @@
                             </div>
                         </div>
 
-                        <!-- Hidden fields for removed images -->
+                        <!-- Hidden fields for tracking changes -->
                         <input type="hidden" id="removed_images" name="removed_images" value="">
+                        <input type="hidden" id="primary_image_id" name="primary_image_id" value="{{ $product->primary_image_id }}">
                     </form>
                 </div>
             </div>
@@ -265,51 +279,24 @@
 .image-preview {
     position: relative;
     margin-bottom: 15px;
+    border-radius: 0.375rem;
+    overflow: hidden;
 }
 
 .image-preview img {
     width: 100%;
     height: 150px;
     object-fit: cover;
-    border-radius: 0.375rem;
     border: 2px solid #dee2e6;
-}
-
-.image-preview .remove-image {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    background: rgba(220, 53, 69, 0.8);
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 30px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-
-.image-preview .remove-image:hover {
-    background: rgba(220, 53, 69, 1);
-}
-
-.image-preview .primary-badge {
-    position: absolute;
-    top: 5px;
-    left: 5px;
-    background: rgba(40, 167, 69, 0.9);
-    color: white;
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: bold;
+    transition: all 0.3s ease;
 }
 
 .current-image {
     border: 2px solid #28a745;
+}
+
+.current-image img {
+    border-color: #28a745;
 }
 
 .removed-image {
@@ -317,17 +304,68 @@
     border: 2px solid #dc3545;
 }
 
-.removed-image .remove-image {
-    background: rgba(40, 167, 69, 0.8);
+.removed-image img {
+    border-color: #dc3545;
 }
 
-.removed-image .remove-image:hover {
-    background: rgba(40, 167, 69, 1);
+.image-controls {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    display: flex;
+    gap: 5px;
+}
+
+.image-controls .btn {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.primary-badge {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    background: rgba(255, 193, 7, 0.9);
+    color: #212529;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.image-info {
+    position: absolute;
+    bottom: 5px;
+    left: 5px;
+    right: 5px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    text-align: center;
+}
+
+.new-image {
+    border: 2px solid #007bff;
+}
+
+.new-image img {
+    border-color: #007bff;
 }
 
 .form-control:focus {
     border-color: #007bff;
     box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.current-image:hover img {
+    transform: scale(1.05);
 }
 </style>
 @endpush
@@ -337,6 +375,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     let selectedNewFiles = [];
     let removedImageIds = [];
+    let primaryImageId = {{ $product->primary_image_id ?? 'null' }};
 
     // Character counter for description
     const descriptionTextarea = document.getElementById('description');
@@ -366,7 +405,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function handleNewFileSelection(files) {
         const fileArray = Array.from(files);
 
-        // Validate file count (considering current images)
+        // Validate total image count
         const currentImageCount = getCurrentImageCount();
         const totalImages = currentImageCount + fileArray.length;
 
@@ -411,12 +450,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 const col = document.createElement('div');
                 col.className = 'col-md-6 col-lg-4';
 
+                const fileSize = (file.size / 1024).toFixed(1) + ' KB';
+
                 col.innerHTML = `
-                    <div class="image-preview">
+                    <div class="image-preview new-image">
                         <img src="${e.target.result}" alt="Nouvelle image ${index + 1}">
-                        <button type="button" class="remove-image" onclick="removeNewImage(${index})">
-                            <i class="fas fa-times"></i>
-                        </button>
+                        <div class="image-controls">
+                            <button type="button" class="btn btn-sm btn-danger" onclick="removeNewImage(${index})">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="image-info">${file.name} (${fileSize})</div>
                     </div>
                 `;
 
@@ -434,7 +478,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Restore image
             removedImageIds = removedImageIds.filter(id => id !== imageId);
             imageElement.querySelector('.image-preview').classList.remove('removed-image');
-            imageElement.querySelector('.remove-image i').className = 'fas fa-times';
+            imageElement.querySelector('.remove-current-image i').className = 'fas fa-times';
         } else {
             // Check if removing this image would leave us with no images
             const remainingImages = getCurrentImageCount() - 1 + selectedNewFiles.length;
@@ -443,13 +487,56 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
+            // Check if this is the primary image
+            if (primaryImageId === imageId) {
+                // Find another image to set as primary
+                const otherImages = document.querySelectorAll('[data-image-id]');
+                let newPrimaryId = null;
+
+                for (let img of otherImages) {
+                    const imgId = parseInt(img.dataset.imageId);
+                    if (imgId !== imageId && !removedImageIds.includes(imgId)) {
+                        newPrimaryId = imgId;
+                        break;
+                    }
+                }
+
+                if (newPrimaryId) {
+                    setPrimaryImage(newPrimaryId);
+                }
+            }
+
             // Mark for removal
             removedImageIds.push(imageId);
             imageElement.querySelector('.image-preview').classList.add('removed-image');
-            imageElement.querySelector('.remove-image i').className = 'fas fa-undo';
+            imageElement.querySelector('.remove-current-image i').className = 'fas fa-undo';
         }
 
         updateRemovedImagesInput();
+    };
+
+    window.setPrimaryImage = function(imageId) {
+        // Remove primary badge from all images
+        document.querySelectorAll('.primary-badge').forEach(badge => badge.remove());
+        document.querySelectorAll('.set-primary-btn').forEach(btn => btn.style.display = 'block');
+
+        // Add primary badge to selected image
+        const imageElement = document.querySelector(`[data-image-id="${imageId}"]`);
+        if (imageElement && !removedImageIds.includes(imageId)) {
+            const primaryBadge = document.createElement('div');
+            primaryBadge.className = 'primary-badge';
+            primaryBadge.textContent = 'Principal';
+            imageElement.querySelector('.image-preview').appendChild(primaryBadge);
+
+            // Hide set primary button for this image
+            const setPrimaryBtn = imageElement.querySelector('.set-primary-btn');
+            if (setPrimaryBtn) {
+                setPrimaryBtn.style.display = 'none';
+            }
+
+            primaryImageId = imageId;
+            document.getElementById('primary_image_id').value = imageId;
+        }
     };
 
     window.removeNewImage = function(index) {
@@ -502,6 +589,11 @@ document.addEventListener('DOMContentLoaded', function() {
             removedImageIds.forEach(id => {
                 formData.append('removed_images[]', id);
             });
+        }
+
+        // Add primary image ID
+        if (primaryImageId) {
+            formData.append('primary_image_id', primaryImageId);
         }
 
         // Add action

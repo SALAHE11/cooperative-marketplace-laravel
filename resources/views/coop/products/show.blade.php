@@ -22,10 +22,12 @@
                         <i class="fas fa-arrow-left me-2"></i>
                         Retour aux produits
                     </a>
-                    <button type="button" class="btn btn-outline-info" onclick="openImageGallery()">
-                        <i class="fas fa-images me-1"></i>
-                        Voir Images ({{ $product->images->count() }})
-                    </button>
+                    @if($product->hasImages())
+                        <button type="button" class="btn btn-outline-info" onclick="openImageGallery()">
+                            <i class="fas fa-images me-1"></i>
+                            Voir Images ({{ $product->images_count }})
+                        </button>
+                    @endif
                 </div>
             </div>
         </div>
@@ -94,6 +96,10 @@
                                             @endif
                                         </span>
                                     </div>
+                                    <div class="info-row">
+                                        <span class="info-label">Images:</span>
+                                        <span class="info-value fw-bold">{{ $product->images_count }}</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -145,40 +151,72 @@
                 </div>
             </div>
 
-            <!-- Product Images Preview -->
-            @if($product->images->count() > 0)
+            <!-- Enhanced Product Images Preview -->
+            @if($product->hasImages())
                 <div class="card shadow">
                     <div class="card-header py-3">
                         <h6 class="m-0 font-weight-bold text-primary">
                             <i class="fas fa-images me-2"></i>
-                            Aperçu des Images ({{ $product->images->count() }})
+                            Images du Produit ({{ $product->images_count }})
                         </h6>
                     </div>
                     <div class="card-body">
                         <div class="row">
-                            @foreach($product->images->take(4) as $image)
-                                <div class="col-md-3 col-6 mb-3">
-                                    <div class="image-preview-item" onclick="openImageGallery({{ $loop->index }})">
+                            @foreach($product->images->take(6) as $image)
+                                <div class="col-md-4 col-lg-3 mb-3">
+                                    <div class="image-preview-item {{ $product->primary_image_id === $image->id ? 'primary-image' : '' }}"
+                                         onclick="openImageGallery({{ $loop->index }})">
                                         <img src="{{ $image->thumbnail_url ?: $image->image_url }}"
                                              alt="Image produit {{ $loop->iteration }}"
                                              class="img-fluid rounded preview-image">
-                                        @if($image->is_primary)
+                                        @if($product->primary_image_id === $image->id)
                                             <div class="primary-badge">
                                                 <i class="fas fa-star"></i>
                                                 Principal
                                             </div>
                                         @endif
+                                        @if($image->processing_status !== 'ready')
+                                            <div class="processing-badge">
+                                                @if($image->processing_status === 'processing')
+                                                    <i class="fas fa-spinner fa-spin"></i>
+                                                    Traitement...
+                                                @elseif($image->processing_status === 'failed')
+                                                    <i class="fas fa-exclamation-triangle"></i>
+                                                    Erreur
+                                                @else
+                                                    <i class="fas fa-clock"></i>
+                                                    En attente
+                                                @endif
+                                            </div>
+                                        @endif
+                                        <div class="image-info">
+                                            <small>{{ $image->formatted_file_size }} • {{ $image->dimensions }}</small>
+                                        </div>
                                     </div>
                                 </div>
                             @endforeach
                         </div>
-                        @if($product->images->count() > 4)
+                        @if($product->images_count > 6)
                             <div class="text-center mt-3">
                                 <button type="button" class="btn btn-outline-primary" onclick="openImageGallery()">
                                     <i class="fas fa-images me-1"></i>
-                                    Voir toutes les images (+{{ $product->images->count() - 4 }} autres)
+                                    Voir toutes les images (+{{ $product->images_count - 6 }} autres)
                                 </button>
                             </div>
+                        @endif
+                    </div>
+                </div>
+            @else
+                <div class="card shadow">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-image fa-4x text-muted mb-3"></i>
+                        <h5 class="text-muted">Aucune image</h5>
+                        <p class="text-muted">Ce produit n'a pas d'images associées.</p>
+                        @if($product->canBeEdited())
+                            <a href="{{ route('coop.products.edit', $product) }}" class="btn btn-primary">
+                                <i class="fas fa-plus me-1"></i>
+                                Ajouter des images
+                            </a>
                         @endif
                     </div>
                 </div>
@@ -199,6 +237,14 @@
                     <span class="badge bg-{{ $product->status_badge }} fs-6 mb-3">
                         {{ $product->status_text }}
                     </span>
+
+                    @if($product->isUpdatedVersion())
+                        <div class="alert alert-warning mb-3">
+                            <i class="fas fa-sync-alt me-1"></i>
+                            <strong>Version mise à jour</strong><br>
+                            <small>Ce produit a été modifié après approbation</small>
+                        </div>
+                    @endif
 
                     <div class="small text-muted">
                         @if($product->reviewedBy)
@@ -260,27 +306,25 @@
                             </button>
                         @endif
 
-                        @if($product->isDraft())
-                            <button type="button" class="btn btn-danger" onclick="deleteProduct({{ $product->id }}, '{{ addslashes($product->name) }}')">
-                                <span class="spinner-border spinner-border-sm me-2 d-none" role="status"></span>
-                                <i class="fas fa-trash me-1"></i>
-                                Supprimer le Produit
-                            </button>
-                        @endif
+                        <button type="button" class="btn btn-danger" onclick="deleteProduct({{ $product->id }}, '{{ addslashes($product->name) }}', '{{ $product->status }}')">
+                            <span class="spinner-border spinner-border-sm me-2 d-none" role="status"></span>
+                            <i class="fas fa-trash me-1"></i>
+                            Supprimer le Produit
+                        </button>
                     </div>
 
-                    @if(!$product->canBeEdited() && !$product->canBeSubmitted() && !$product->isDraft())
+                    @if(!$product->canBeEdited() && !$product->canBeSubmitted())
                         <div class="alert alert-info mt-3">
                             <small>
                                 <i class="fas fa-info-circle me-1"></i>
-                                Ce produit ne peut pas être modifié dans son état actuel.
+                                Certaines actions peuvent être limitées selon le statut du produit.
                             </small>
                         </div>
                     @endif
                 </div>
             </div>
 
-            <!-- Quick Stats -->
+            <!-- Enhanced Quick Stats -->
             <div class="card shadow">
                 <div class="card-header py-3">
                     <h6 class="m-0 font-weight-bold text-dark">
@@ -291,7 +335,7 @@
                 <div class="card-body">
                     <div class="row text-center">
                         <div class="col-6 border-end">
-                            <div class="h5 mb-0 text-primary">{{ $product->images->count() }}</div>
+                            <div class="h5 mb-0 text-primary">{{ $product->images_count }}</div>
                             <small class="text-muted">Images</small>
                         </div>
                         <div class="col-6">
@@ -301,18 +345,36 @@
                     </div>
                     <hr>
                     <div class="row text-center">
-                        <div class="col-12">
+                        <div class="col-6 border-end">
                             <div class="h6 mb-0 text-info">{{ $product->created_at->diffForHumans() }}</div>
                             <small class="text-muted">Créé</small>
                         </div>
+                        <div class="col-6">
+                            <div class="h6 mb-0 text-warning">{{ $product->updated_at->diffForHumans() }}</div>
+                            <small class="text-muted">Modifié</small>
+                        </div>
                     </div>
+                    @if($product->hasImages())
+                        <hr>
+                        <div class="row text-center">
+                            <div class="col-12">
+                                @php
+                                    $readyImages = $product->images()->where('processing_status', 'ready')->count();
+                                @endphp
+                                <div class="h6 mb-0 text-{{ $readyImages === $product->images_count ? 'success' : 'warning' }}">
+                                    {{ $readyImages }}/{{ $product->images_count }}
+                                </div>
+                                <small class="text-muted">Images prêtes</small>
+                            </div>
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Image Gallery Modal -->
+<!-- Enhanced Image Gallery Modal -->
 <div class="modal fade" id="imageGalleryModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
@@ -348,7 +410,10 @@
                 {
                     "url": "{{ $image->image_url }}",
                     "thumbnail": "{{ $image->thumbnail_url ?: $image->image_url }}",
-                    "isPrimary": {{ $image->is_primary ? 'true' : 'false' }}
+                    "isPrimary": {{ $product->primary_image_id === $image->id ? 'true' : 'false' }},
+                    "processingStatus": "{{ $image->processing_status }}",
+                    "fileSize": "{{ $image->formatted_file_size }}",
+                    "dimensions": "{{ $image->dimensions }}"
                 }{{ $index < $product->images->count() - 1 ? ',' : '' }}
             @endforeach
         ],
@@ -359,7 +424,7 @@
 
 @push('styles')
 <style>
-/* Info Cards Styling */
+/* Enhanced info cards and image styling */
 .info-card {
     background: #f8f9fa;
     border: 1px solid #e9ecef;
@@ -422,11 +487,13 @@
     white-space: pre-wrap;
 }
 
-/* Image Preview Styling */
+/* Enhanced image preview styling */
 .image-preview-item {
     position: relative;
     cursor: pointer;
     transition: all 0.3s ease;
+    border-radius: 0.375rem;
+    overflow: hidden;
 }
 
 .image-preview-item:hover {
@@ -445,6 +512,11 @@
     border-color: #007bff;
 }
 
+.primary-image .preview-image {
+    border-color: #ffc107;
+    border-width: 3px;
+}
+
 .primary-badge {
     position: absolute;
     top: 5px;
@@ -460,7 +532,32 @@
     gap: 0.2rem;
 }
 
-/* Image Gallery Styling */
+.processing-badge {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.25rem;
+    font-weight: bold;
+}
+
+.image-info {
+    position: absolute;
+    bottom: 5px;
+    left: 5px;
+    right: 5px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.7rem;
+    text-align: center;
+}
+
+/* Enhanced image gallery styling */
 .image-gallery-container {
     display: flex;
     flex-direction: column;
@@ -602,7 +699,7 @@ document.addEventListener('DOMContentLoaded', function() {
     imageGalleryModal = new bootstrap.Modal(document.getElementById('imageGalleryModal'));
 });
 
-// Image Gallery Functions
+// Enhanced Image Gallery Functions
 function openImageGallery(startIndex = 0) {
     const imagesDataElement = document.getElementById('productImagesData');
     if (!imagesDataElement) {
@@ -611,14 +708,14 @@ function openImageGallery(startIndex = 0) {
     }
 
     const data = JSON.parse(imagesDataElement.textContent);
-    galleryImages = data.images;
+    galleryImages = data.images.filter(img => img.processingStatus === 'ready');
 
     if (galleryImages.length === 0) {
-        showAlert('Aucune image disponible pour ce produit', 'warning');
+        showAlert('Aucune image prête disponible pour ce produit', 'warning');
         return;
     }
 
-    currentImageIndex = startIndex;
+    currentImageIndex = Math.min(startIndex, galleryImages.length - 1);
     createImageGallery();
     imageGalleryModal.show();
 }
@@ -631,7 +728,7 @@ function createImageGallery() {
             <div class="text-center py-5">
                 <i class="fas fa-image fa-4x text-muted mb-3"></i>
                 <h5 class="text-muted">Aucune image disponible</h5>
-                <p class="text-muted">Ce produit n'a pas d'images associées.</p>
+                <p class="text-muted">Ce produit n'a pas d'images prêtes.</p>
             </div>
         `;
         return;
@@ -645,37 +742,46 @@ function createImageGallery() {
                      src="${galleryImages[currentImageIndex].url}"
                      alt="Image principale du produit"
                      class="main-gallery-image">
-                <div class="image-navigation">
-                    <button type="button" class="nav-btn nav-prev" onclick="previousImage()">
-                        <i class="fas fa-chevron-left"></i>
-                    </button>
-                    <button type="button" class="nav-btn nav-next" onclick="nextImage()">
-                        <i class="fas fa-chevron-right"></i>
-                    </button>
-                </div>
+                ${galleryImages.length > 1 ? `
+                    <div class="image-navigation">
+                        <button type="button" class="nav-btn nav-prev" onclick="previousImage()">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <button type="button" class="nav-btn nav-next" onclick="nextImage()">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                ` : ''}
                 <div class="image-counter">
                     <span id="currentImageIndex">${currentImageIndex + 1}</span> / ${galleryImages.length}
+                    ${galleryImages[currentImageIndex].isPrimary ? ' • <i class="fas fa-star text-warning"></i> Principal' : ''}
                 </div>
+                ${galleryImages[currentImageIndex].fileSize || galleryImages[currentImageIndex].dimensions ? `
+                    <div class="image-counter" style="left: 1rem; right: auto;">
+                        ${galleryImages[currentImageIndex].fileSize || ''} ${galleryImages[currentImageIndex].dimensions ? '• ' + galleryImages[currentImageIndex].dimensions : ''}
+                    </div>
+                ` : ''}
             </div>
 
-            <!-- Thumbnail Strip -->
-            <div class="thumbnail-strip">
-                ${galleryImages.map((image, index) => `
-                    <div class="thumbnail-item ${index === currentImageIndex ? 'active' : ''}"
-                         onclick="selectImage(${index}, '${image.url}')"
-                         data-index="${index}">
-                        <img src="${image.thumbnail}"
-                             alt="Miniature ${index + 1}"
-                             class="thumbnail-image">
-                        ${image.isPrimary ? `
-                            <div class="primary-badge">
-                                <i class="fas fa-star"></i>
-                                Principal
-                            </div>
-                        ` : ''}
-                    </div>
-                `).join('')}
-            </div>
+            ${galleryImages.length > 1 ? `
+                <!-- Thumbnail Strip -->
+                <div class="thumbnail-strip">
+                    ${galleryImages.map((image, index) => `
+                        <div class="thumbnail-item ${index === currentImageIndex ? 'active' : ''}"
+                             onclick="selectImage(${index}, '${image.url}')"
+                             data-index="${index}">
+                            <img src="${image.thumbnail}"
+                                 alt="Miniature ${index + 1}"
+                                 class="thumbnail-image">
+                            ${image.isPrimary ? `
+                                <div class="primary-badge">
+                                    <i class="fas fa-star"></i>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
         </div>
     `;
 
@@ -688,8 +794,11 @@ function selectImage(index, imageUrl) {
     // Update main image
     document.getElementById('mainGalleryImage').src = imageUrl;
 
-    // Update counter
-    document.getElementById('currentImageIndex').textContent = index + 1;
+    // Update counter and info
+    const counterElement = document.getElementById('currentImageIndex');
+    if (counterElement) {
+        counterElement.textContent = index + 1;
+    }
 
     // Update active thumbnail
     document.querySelectorAll('.thumbnail-item').forEach((item, i) => {
@@ -756,8 +865,38 @@ function submitProduct(productId) {
     });
 }
 
-function deleteProduct(productId, productName) {
-    if (!confirm(`Êtes-vous sûr de vouloir supprimer le produit "${productName}" ?`)) {
+function deleteProduct(productId, productName, productStatus) {
+    let confirmMessage = '';
+    let warningMessage = '';
+
+    switch(productStatus) {
+        case 'draft':
+            confirmMessage = `Êtes-vous sûr de vouloir supprimer le brouillon "${productName}" ?`;
+            break;
+        case 'pending':
+            confirmMessage = `Êtes-vous sûr de vouloir supprimer le produit "${productName}" en attente d'approbation ?`;
+            warningMessage = 'Ce produit est en cours d\'examen par l\'administration.';
+            break;
+        case 'approved':
+            confirmMessage = `Êtes-vous sûr de vouloir supprimer le produit approuvé "${productName}" ?`;
+            warningMessage = 'ATTENTION: Ce produit est approuvé et visible aux clients!';
+            break;
+        case 'rejected':
+            confirmMessage = `Êtes-vous sûr de vouloir supprimer le produit rejeté "${productName}" ?`;
+            break;
+        case 'needs_info':
+            confirmMessage = `Êtes-vous sûr de vouloir supprimer le produit "${productName}" ?`;
+            warningMessage = 'L\'administration attend des clarifications sur ce produit.';
+            break;
+        default:
+            confirmMessage = `Êtes-vous sûr de vouloir supprimer le produit "${productName}" ?`;
+    }
+
+    if (warningMessage) {
+        confirmMessage = warningMessage + '\n\n' + confirmMessage;
+    }
+
+    if (!confirm(confirmMessage)) {
         return;
     }
 

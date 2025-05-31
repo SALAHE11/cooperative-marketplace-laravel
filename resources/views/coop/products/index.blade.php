@@ -117,8 +117,8 @@
                                     <div class="card product-card h-100">
                                         <!-- Product Image -->
                                         <div class="product-image-container">
-                                            @if($product->primaryImageUrl)
-                                                <img src="{{ $product->primaryImageUrl }}"
+                                            @if($product->primary_thumbnail_url)
+                                                <img src="{{ $product->primary_thumbnail_url }}"
                                                      class="card-img-top product-image"
                                                      alt="{{ $product->name }}">
                                             @else
@@ -139,6 +139,16 @@
                                                     </span>
                                                 @endif
                                             </div>
+
+                                            <!-- Image Count Badge -->
+                                            @if($product->images_count > 0)
+                                                <div class="product-image-count">
+                                                    <span class="badge bg-dark">
+                                                        <i class="fas fa-images me-1"></i>
+                                                        {{ $product->images_count }}
+                                                    </span>
+                                                </div>
+                                            @endif
                                         </div>
 
                                         <div class="card-body d-flex flex-column">
@@ -174,42 +184,45 @@
 
                                             <!-- Action Buttons -->
                                             <div class="product-actions mt-auto">
-                                                <a href="{{ route('coop.products.show', $product) }}"
-                                                   class="btn btn-outline-primary btn-sm">
-                                                    <i class="fas fa-eye me-1"></i>
-                                                    Détails
-                                                </a>
-
-                                                @if($product->canBeEdited())
-                                                    <a href="{{ route('coop.products.edit', $product) }}"
-                                                       class="btn btn-primary btn-sm">
-                                                        <i class="fas fa-edit me-1"></i>
-                                                        Modifier
+                                                <div class="btn-group w-100 mb-2" role="group">
+                                                    <a href="{{ route('coop.products.show', $product) }}"
+                                                       class="btn btn-outline-primary btn-sm">
+                                                        <i class="fas fa-eye me-1"></i>
+                                                        Détails
                                                     </a>
-                                                @endif
 
-                                                @if($product->canBeSubmitted())
-                                                    <button class="btn btn-success btn-sm"
-                                                            onclick="submitProduct({{ $product->id }})">
-                                                        <i class="fas fa-paper-plane me-1"></i>
-                                                        Soumettre
+                                                    @if($product->canBeEdited())
+                                                        <a href="{{ route('coop.products.edit', $product) }}"
+                                                           class="btn btn-primary btn-sm">
+                                                            <i class="fas fa-edit me-1"></i>
+                                                            Modifier
+                                                        </a>
+                                                    @endif
+                                                </div>
+
+                                                <div class="btn-group w-100" role="group">
+                                                    @if($product->canBeSubmitted())
+                                                        <button class="btn btn-success btn-sm"
+                                                                onclick="submitProduct({{ $product->id }})">
+                                                            <i class="fas fa-paper-plane me-1"></i>
+                                                            Soumettre
+                                                        </button>
+                                                    @endif
+
+                                                    <button class="btn btn-danger btn-sm"
+                                                            onclick="deleteProduct({{ $product->id }}, '{{ addslashes($product->name) }}', '{{ $product->status }}')">
+                                                        <i class="fas fa-trash me-1"></i>
+                                                        Supprimer
                                                     </button>
-                                                @endif
-
-                                                <!-- NEW: Allow deletion of all product types -->
-                                                <button class="btn btn-danger btn-sm"
-                                                        onclick="deleteProduct({{ $product->id }}, '{{ addslashes($product->name) }}', '{{ $product->status }}')">
-                                                    <i class="fas fa-trash me-1"></i>
-                                                    Supprimer
-                                                </button>
+                                                </div>
 
                                                 @if($product->rejection_reason || $product->admin_notes)
-                                                    <button class="btn btn-info btn-sm"
+                                                    <button class="btn btn-info btn-sm w-100 mt-2"
                                                             onclick="showProductNotes({{ $product->id }}, '{{ addslashes($product->name) }}',
                                                                                    '{{ addslashes($product->rejection_reason ?? '') }}',
                                                                                    '{{ addslashes($product->admin_notes ?? '') }}')">
                                                         <i class="fas fa-comment me-1"></i>
-                                                        Notes
+                                                        Voir les Notes
                                                     </button>
                                                 @endif
                                             </div>
@@ -309,9 +322,10 @@
     right: 10px;
 }
 
-.product-actions .btn {
-    margin-right: 5px;
-    margin-bottom: 5px;
+.product-image-count {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
 }
 
 .nav-tabs .nav-link {
@@ -359,7 +373,6 @@ function submitProduct(productId) {
 }
 
 function deleteProduct(productId, productName, productStatus) {
-    // NEW: Different confirmation messages based on product status
     let confirmMessage = '';
     let warningMessage = '';
 

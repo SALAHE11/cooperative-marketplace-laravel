@@ -1,9 +1,11 @@
 <?php
+// app/Models/Product.php
 
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class Product extends Model
 {
@@ -16,7 +18,6 @@ class Product extends Model
         'description',
         'price',
         'stock_quantity',
-        'image_path', // Keep for backward compatibility
         'status',
         'rejection_reason',
         'is_active',
@@ -24,7 +25,9 @@ class Product extends Model
         'reviewed_at',
         'reviewed_by',
         'admin_notes',
-        'original_data', // NEW: Store original approved version
+        'original_data',
+        'primary_image_id',
+        'images_count',
     ];
 
     protected $casts = [
@@ -32,9 +35,11 @@ class Product extends Model
         'is_active' => 'boolean',
         'submitted_at' => 'datetime',
         'reviewed_at' => 'datetime',
-        'original_data' => 'array', // NEW: Cast to array for JSON handling
+        'original_data' => 'array',
+        'images_count' => 'integer',
     ];
 
+    // Relationships
     public function cooperative()
     {
         return $this->belongsTo(Cooperative::class);
@@ -57,12 +62,17 @@ class Product extends Model
 
     public function images()
     {
+        return $this->hasMany(ProductImage::class)->whereNull('deleted_at')->orderBy('sort_order');
+    }
+
+    public function allImages()
+    {
         return $this->hasMany(ProductImage::class)->orderBy('sort_order');
     }
 
     public function primaryImage()
     {
-        return $this->hasOne(ProductImage::class)->where('is_primary', true);
+        return $this->belongsTo(ProductImage::class, 'primary_image_id');
     }
 
     public function reviewedBy()
@@ -98,7 +108,7 @@ class Product extends Model
 
     public function canBeEdited()
     {
-        return in_array($this->status, ['draft', 'rejected', 'needs_info', 'approved']); // NEW: Allow editing approved products
+        return in_array($this->status, ['draft', 'rejected', 'needs_info', 'approved']);
     }
 
     public function canBeSubmitted()
@@ -106,13 +116,11 @@ class Product extends Model
         return in_array($this->status, ['draft', 'rejected', 'needs_info']);
     }
 
-    // NEW: Check if this is an updated version of a previously approved product
     public function isUpdatedVersion()
     {
         return !empty($this->original_data);
     }
 
-    // NEW: Store current data as original version before update
     public function storeOriginalData()
     {
         $this->original_data = [
@@ -122,28 +130,68 @@ class Product extends Model
             'stock_quantity' => $this->stock_quantity,
             'category_id' => $this->category_id,
             'category_name' => $this->category->name ?? 'N/A',
-            'images_count' => $this->images->count(),
+            'images_count' => $this->images_count,
             'updated_at' => $this->updated_at->toISOString(),
         ];
+    }
+
+    // Image management methods
+    public function updateImagesCount()
+    {
+        $this->images_count = $this->images()->count();
+        $this->save();
+    }
+
+    public function setPrimaryImage($imageId = null)
+    {
+        if ($imageId) {
+            $image = $this->images()->find($imageId);
+            if ($image) {
+                $this->primary_image_id = $imageId;
+                $this->save();
+                return true;
+            }
+        } else {
+            // Auto-select first image as primary
+            $firstImage = $this->images()->orderBy('sort_order')->first();
+            if ($firstImage) {
+                $this->primary_image_id = $firstImage->id;
+                $this->save();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public function hasImages()
+    {
+        return $this->images_count > 0;
     }
 
     // Get primary image URL or fallback
     public function getPrimaryImageUrlAttribute()
     {
-        $primaryImage = $this->primaryImage;
-        if ($primaryImage) {
-            return $primaryImage->image_url;
+        if ($this->primaryImage && $this->primaryImage->isReady()) {
+            return $this->primaryImage->image_url;
         }
 
-        // Fallback to first image
-        $firstImage = $this->images()->first();
+        $firstImage = $this->images()->where('processing_status', 'ready')->first();
         if ($firstImage) {
             return $firstImage->image_url;
         }
 
-        // Fallback to old image_path field
-        if ($this->image_path) {
-            return asset('storage/' . $this->image_path);
+        return null;
+    }
+
+    public function getPrimaryThumbnailUrlAttribute()
+    {
+        if ($this->primaryImage && $this->primaryImage->isReady()) {
+            return $this->primaryImage->thumbnail_url;
+        }
+
+        $firstImage = $this->images()->where('processing_status', 'ready')->first();
+        if ($firstImage) {
+            return $firstImage->thumbnail_url;
         }
 
         return null;
@@ -173,5 +221,16 @@ class Product extends Model
         ];
 
         return $texts[$this->status] ?? 'Inconnu';
+    }
+
+    // Model events
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::deleting(function ($product) {
+            // Soft delete all images
+            $product->allImages()->update(['deleted_at' => now()]);
+        });
     }
 }

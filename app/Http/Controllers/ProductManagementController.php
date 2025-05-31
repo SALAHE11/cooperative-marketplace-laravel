@@ -1,4 +1,5 @@
 <?php
+// app/Http/Controllers/ProductManagementController.php
 
 namespace App\Http\Controllers;
 
@@ -9,7 +10,6 @@ use App\Services\ImageProcessingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
@@ -33,14 +33,12 @@ class ProductManagementController extends Controller
         $search = $request->get('search', '');
         $status = $request->get('status', 'all');
 
-        $query = $cooperative->products()->with(['category', 'images']);
+        $query = $cooperative->products()->with(['category', 'primaryImage']);
 
-        // Apply status filter
         if ($status !== 'all') {
             $query->where('status', $status);
         }
 
-        // Apply search filter
         if ($search) {
             $query->where(function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
@@ -50,7 +48,6 @@ class ProductManagementController extends Controller
 
         $products = $query->orderBy('updated_at', 'desc')->paginate(12);
 
-        // Get counts for tabs
         $counts = [
             'all' => $cooperative->products()->count(),
             'draft' => $cooperative->products()->where('status', 'draft')->count(),
@@ -73,7 +70,6 @@ class ProductManagementController extends Controller
         }
 
         $categories = Category::orderBy('name')->get();
-
         return view('coop.products.create', compact('categories'));
     }
 
@@ -88,7 +84,6 @@ class ProductManagementController extends Controller
 
         $action = $request->input('action', 'save_draft');
 
-        // Base validation rules
         $rules = [
             'category_id' => 'required|exists:categories,id',
             'name' => 'required|string|max:255',
@@ -97,7 +92,6 @@ class ProductManagementController extends Controller
             'stock_quantity' => 'required|integer|min:0',
         ];
 
-        // For submission, images are required
         if ($action === 'submit') {
             $rules['images'] = 'required|array|min:1|max:5';
             $rules['images.*'] = 'image|mimes:jpeg,png,jpg,webp|max:2048';
@@ -111,25 +105,30 @@ class ProductManagementController extends Controller
 
             DB::beginTransaction();
 
-            // Create product
-            $product = new Product();
-            $product->cooperative_id = $cooperative->id;
-            $product->category_id = $validatedData['category_id'];
-            $product->name = $validatedData['name'];
-            $product->description = $validatedData['description'];
-            $product->price = $validatedData['price'];
-            $product->stock_quantity = $validatedData['stock_quantity'];
-            $product->status = $action === 'submit' ? 'pending' : 'draft';
+            $product = Product::create([
+                'cooperative_id' => $cooperative->id,
+                'category_id' => $validatedData['category_id'],
+                'name' => $validatedData['name'],
+                'description' => $validatedData['description'],
+                'price' => $validatedData['price'],
+                'stock_quantity' => $validatedData['stock_quantity'],
+                'status' => $action === 'submit' ? 'pending' : 'draft',
+                'submitted_at' => $action === 'submit' ? now() : null,
+            ]);
 
-            if ($action === 'submit') {
-                $product->submitted_at = now();
-            }
-
-            $product->save();
-
-            // Handle images
             if ($request->hasFile('images')) {
-                $this->processAndStoreImages($product, $request->file('images'));
+                $results = ImageProcessingService::processMultipleImages(
+                    $request->file('images'),
+                    $product->id
+                );
+
+                if (!empty($results['errors'])) {
+                    $errorMessages = array_map(function($error) {
+                        return $error['file'] . ': ' . $error['error'];
+                    }, $results['errors']);
+
+                    Log::warning('Some images failed to process', $results['errors']);
+                }
             }
 
             DB::commit();
@@ -155,13 +154,12 @@ class ProductManagementController extends Controller
             DB::rollBack();
             Log::error('Product creation error', [
                 'error' => $e->getMessage(),
-                'user_id' => $user->id,
-                'cooperative_id' => $cooperative->id
+                'user_id' => $user->id
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de la création du produit.'
+                'message' => 'Erreur lors de la création du produit: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -170,12 +168,11 @@ class ProductManagementController extends Controller
     {
         $user = Auth::user();
 
-        // Check if the product belongs to the user's cooperative
         if ($product->cooperative_id !== $user->cooperative_id) {
             abort(403, 'Accès non autorisé à ce produit.');
         }
 
-        $product->load(['category', 'images', 'cooperative', 'reviewedBy']);
+        $product->load(['category', 'images', 'cooperative', 'reviewedBy', 'primaryImage']);
 
         return view('coop.products.show', compact('product'));
     }
@@ -184,14 +181,13 @@ class ProductManagementController extends Controller
     {
         $user = Auth::user();
 
-        // Check if the product belongs to the user's cooperative
         if ($product->cooperative_id !== $user->cooperative_id) {
             abort(403, 'Accès non autorisé à ce produit.');
         }
 
-        // Check if product can be edited
         if (!$product->canBeEdited()) {
-            return redirect()->route('coop.products.index')->with('error', 'Ce produit ne peut pas être modifié dans son état actuel.');
+            return redirect()->route('coop.products.index')
+                ->with('error', 'Ce produit ne peut pas être modifié dans son état actuel.');
         }
 
         $categories = Category::orderBy('name')->get();
@@ -204,19 +200,16 @@ class ProductManagementController extends Controller
     {
         $user = Auth::user();
 
-        // Check if the product belongs to the user's cooperative
         if ($product->cooperative_id !== $user->cooperative_id) {
             return response()->json(['success' => false, 'message' => 'Accès non autorisé.'], 403);
         }
 
-        // Check if product can be edited
         if (!$product->canBeEdited()) {
             return response()->json(['success' => false, 'message' => 'Ce produit ne peut pas être modifié.'], 403);
         }
 
         $action = $request->input('action', 'save_draft');
 
-        // Base validation rules
         $rules = [
             'category_id' => 'required|exists:categories,id',
             'name' => 'required|string|max:255',
@@ -227,6 +220,8 @@ class ProductManagementController extends Controller
             'new_images.*' => 'image|mimes:jpeg,png,jpg,webp|max:2048',
             'removed_images' => 'nullable|array',
             'removed_images.*' => 'integer|exists:product_images,id',
+            'image_order' => 'nullable|array',
+            'primary_image_id' => 'nullable|integer|exists:product_images,id',
         ];
 
         try {
@@ -234,9 +229,8 @@ class ProductManagementController extends Controller
 
             DB::beginTransaction();
 
-            // NEW: Store original data if this is an approved product being updated
             if ($product->isApproved() && !$product->isUpdatedVersion()) {
-                $product->load('category'); // Ensure category is loaded
+                $product->load('category');
                 $product->storeOriginalData();
             }
 
@@ -244,50 +238,65 @@ class ProductManagementController extends Controller
             if ($request->has('removed_images') && is_array($request->removed_images)) {
                 ProductImage::whereIn('id', $request->removed_images)
                     ->where('product_id', $product->id)
-                    ->delete();
+                    ->delete(); // This will soft delete
             }
 
             // Handle new images
             if ($request->hasFile('new_images')) {
-                $this->processAndStoreImages($product, $request->file('new_images'));
+                $currentMaxOrder = $product->images()->max('sort_order') ?? -1;
+                $results = ImageProcessingService::processMultipleImages(
+                    $request->file('new_images'),
+                    $product->id
+                );
+            }
+
+            // Handle image reordering
+            if ($request->has('image_order') && is_array($request->image_order)) {
+                ImageProcessingService::reorderImages($product->id, $request->image_order);
+            }
+
+            // Update primary image
+            if ($request->has('primary_image_id')) {
+                $product->setPrimaryImage($request->primary_image_id);
             }
 
             // Check if we have at least one image
-            $remainingImageCount = $product->images()->count();
-            if ($remainingImageCount === 0) {
+            $product->updateImagesCount();
+            if ($product->images_count === 0) {
                 throw new \Exception('Le produit doit avoir au moins une image.');
             }
 
             // Update product
-            $product->category_id = $validatedData['category_id'];
-            $product->name = $validatedData['name'];
-            $product->description = $validatedData['description'];
-            $product->price = $validatedData['price'];
-            $product->stock_quantity = $validatedData['stock_quantity'];
+            $product->update([
+                'category_id' => $validatedData['category_id'],
+                'name' => $validatedData['name'],
+                'description' => $validatedData['description'],
+                'price' => $validatedData['price'],
+                'stock_quantity' => $validatedData['stock_quantity'],
+            ]);
 
-            // NEW: Update status based on current status and action
+            // Update status based on action
             if ($action === 'submit') {
-                $product->status = 'pending';
-                $product->submitted_at = now();
-                $product->rejection_reason = null;
-                $product->admin_notes = null;
-                $product->reviewed_at = null;
-                $product->reviewed_by = null;
+                $product->update([
+                    'status' => 'pending',
+                    'submitted_at' => now(),
+                    'rejection_reason' => null,
+                    'admin_notes' => null,
+                    'reviewed_at' => null,
+                    'reviewed_by' => null,
+                ]);
+            } else if ($product->isApproved()) {
+                $product->update([
+                    'status' => 'pending',
+                    'submitted_at' => now(),
+                    'rejection_reason' => null,
+                    'admin_notes' => null,
+                    'reviewed_at' => null,
+                    'reviewed_by' => null,
+                ]);
             } else {
-                // If it was approved and we're saving as draft, change status to pending for re-review
-                if ($product->isApproved()) {
-                    $product->status = 'pending';
-                    $product->submitted_at = now();
-                    $product->rejection_reason = null;
-                    $product->admin_notes = null;
-                    $product->reviewed_at = null;
-                    $product->reviewed_by = null;
-                } else {
-                    $product->status = 'draft';
-                }
+                $product->update(['status' => 'draft']);
             }
-
-            $product->save();
 
             DB::commit();
 
@@ -312,8 +321,7 @@ class ProductManagementController extends Controller
             DB::rollBack();
             Log::error('Product update error', [
                 'error' => $e->getMessage(),
-                'product_id' => $product->id,
-                'user_id' => $user->id
+                'product_id' => $product->id
             ]);
 
             return response()->json([
@@ -327,29 +335,27 @@ class ProductManagementController extends Controller
     {
         $user = Auth::user();
 
-        // Check if the product belongs to the user's cooperative
         if ($product->cooperative_id !== $user->cooperative_id) {
             return response()->json(['success' => false, 'message' => 'Accès non autorisé.'], 403);
         }
 
-        // Check if product can be submitted
         if (!$product->canBeSubmitted()) {
             return response()->json(['success' => false, 'message' => 'Ce produit ne peut pas être soumis.'], 400);
         }
 
-        // Check if product has at least one image
-        if ($product->images()->count() === 0) {
+        if (!$product->hasImages()) {
             return response()->json(['success' => false, 'message' => 'Le produit doit avoir au moins une image.'], 400);
         }
 
         try {
-            $product->status = 'pending';
-            $product->submitted_at = now();
-            $product->rejection_reason = null;
-            $product->admin_notes = null;
-            $product->reviewed_at = null;
-            $product->reviewed_by = null;
-            $product->save();
+            $product->update([
+                'status' => 'pending',
+                'submitted_at' => now(),
+                'rejection_reason' => null,
+                'admin_notes' => null,
+                'reviewed_at' => null,
+                'reviewed_by' => null,
+            ]);
 
             return response()->json([
                 'success' => true,
@@ -359,8 +365,7 @@ class ProductManagementController extends Controller
         } catch (\Exception $e) {
             Log::error('Product submission error', [
                 'error' => $e->getMessage(),
-                'product_id' => $product->id,
-                'user_id' => $user->id
+                'product_id' => $product->id
             ]);
 
             return response()->json([
@@ -374,12 +379,10 @@ class ProductManagementController extends Controller
     {
         $user = Auth::user();
 
-        // Check if the product belongs to the user's cooperative
         if ($product->cooperative_id !== $user->cooperative_id) {
             return response()->json(['success' => false, 'message' => 'Accès non autorisé.'], 403);
         }
 
-        // NEW: Allow deletion of all product types, but with different confirmations
         $statusMessages = [
             'draft' => 'Brouillon supprimé avec succès!',
             'pending' => 'Produit en attente supprimé avec succès!',
@@ -391,14 +394,10 @@ class ProductManagementController extends Controller
         try {
             DB::beginTransaction();
 
-            // Store product name for message
-            $productName = $product->name;
             $statusMessage = $statusMessages[$product->status] ?? 'Produit supprimé avec succès!';
 
-            // Delete all images and their files
-            foreach ($product->images as $image) {
-                $image->delete(); // This will trigger the model's boot method to delete files
-            }
+            // Soft delete all images (this will trigger the model events)
+            $product->images()->delete();
 
             // Delete the product
             $product->delete();
@@ -414,9 +413,7 @@ class ProductManagementController extends Controller
             DB::rollBack();
             Log::error('Product deletion error', [
                 'error' => $e->getMessage(),
-                'product_id' => $product->id,
-                'user_id' => $user->id,
-                'product_status' => $product->status
+                'product_id' => $product->id
             ]);
 
             return response()->json([
@@ -426,42 +423,61 @@ class ProductManagementController extends Controller
         }
     }
 
-    /**
-     * Process and store images for a product
-     */
-    private function processAndStoreImages(Product $product, array $images)
+    // New method for managing images via AJAX
+    public function manageImages(Request $request, Product $product)
     {
-        $existingImageCount = $product->images()->count();
-        $isFirstImage = $existingImageCount === 0;
+        $user = Auth::user();
 
-        foreach ($images as $index => $image) {
-            try {
-                $paths = ImageProcessingService::processProductImage($image, $product->id, $index + $existingImageCount);
-
-                ProductImage::create([
-                    'product_id' => $product->id,
-                    'image_path' => $paths['original_path'],
-                    'thumbnail_path' => $paths['thumbnail_path'],
-                    'is_primary' => $isFirstImage && $index === 0,
-                    'sort_order' => $existingImageCount + $index,
-                    'alt_text' => $product->name . ' - Image ' . ($index + 1)
-                ]);
-            } catch (\Exception $e) {
-                Log::error('Image processing failed', [
-                    'product_id' => $product->id,
-                    'image_index' => $index,
-                    'error' => $e->getMessage()
-                ]);
-                // Continue with other images even if one fails
-            }
+        if ($product->cooperative_id !== $user->cooperative_id) {
+            return response()->json(['success' => false, 'message' => 'Accès non autorisé.'], 403);
         }
 
-        // Ensure we have at least one primary image
-        if ($isFirstImage && $product->images()->count() > 0) {
-            $firstImage = $product->images()->orderBy('sort_order')->first();
-            if ($firstImage && !$firstImage->is_primary) {
-                $firstImage->update(['is_primary' => true]);
+        $action = $request->input('action');
+
+        try {
+            DB::beginTransaction();
+
+            switch ($action) {
+                case 'reorder':
+                    $imageIds = $request->input('image_ids', []);
+                    ImageProcessingService::reorderImages($product->id, $imageIds);
+                    $message = 'Images réorganisées avec succès!';
+                    break;
+
+                case 'set_primary':
+                    $imageId = $request->input('image_id');
+                    $product->setPrimaryImage($imageId);
+                    $message = 'Image principale mise à jour!';
+                    break;
+
+                case 'delete':
+                    $imageId = $request->input('image_id');
+                    $image = $product->images()->find($imageId);
+                    if ($image) {
+                        $image->delete();
+                        $message = 'Image supprimée avec succès!';
+                    } else {
+                        throw new \Exception('Image non trouvée.');
+                    }
+                    break;
+
+                default:
+                    throw new \Exception('Action non supportée.');
             }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => $message
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
         }
     }
 }

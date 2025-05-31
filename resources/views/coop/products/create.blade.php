@@ -111,7 +111,7 @@
                             </div>
                         </div>
 
-                        <!-- Images Upload -->
+                        <!-- Enhanced Images Upload -->
                         <div class="mb-4">
                             <label class="form-label">
                                 <i class="fas fa-images me-1"></i>
@@ -125,6 +125,7 @@
                                 <div class="invalid-feedback" id="images_error"></div>
                                 <div class="form-text">
                                     Formats acceptés: JPEG, PNG, JPG, WEBP. Taille max: 2MB par image.
+                                    <br>La première image sera définie comme image principale.
                                 </div>
                             </div>
 
@@ -191,6 +192,7 @@
                             <li>Utilisez des images de haute qualité</li>
                             <li>Montrez le produit sous différents angles</li>
                             <li>Évitez les arrière-plans encombrés</li>
+                            <li>La première image sera l'image principale</li>
                         </ul>
 
                         <p><strong>Description:</strong></p>
@@ -267,6 +269,18 @@
 .btn:hover {
     transform: translateY(-1px);
 }
+
+.image-preview .file-info {
+    position: absolute;
+    bottom: 5px;
+    left: 5px;
+    right: 5px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-size: 0.7rem;
+}
 </style>
 @endpush
 
@@ -342,6 +356,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 const col = document.createElement('div');
                 col.className = 'col-md-6 col-lg-4';
 
+                const fileSize = (file.size / 1024).toFixed(1) + ' KB';
+
                 col.innerHTML = `
                     <div class="image-preview">
                         <img src="${e.target.result}" alt="Preview ${index + 1}">
@@ -349,6 +365,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <button type="button" class="remove-image" onclick="removeImage(${index})">
                             <i class="fas fa-times"></i>
                         </button>
+                        <div class="file-info">${file.name} (${fileSize})</div>
                     </div>
                 `;
 

@@ -1,4 +1,5 @@
 <?php
+// routes/web.php
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
@@ -13,17 +14,6 @@ use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\ProductManagementController;
 use App\Http\Controllers\Admin\ProductRequestManagementController;
-
-/*
-|--------------------------------------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "web" middleware group. Make something great!
-|
-*/
 
 // ===== PUBLIC ROUTES =====
 
@@ -137,7 +127,7 @@ Route::middleware(['auth', 'check.role:system_admin'])->prefix('admin')->name('a
     Route::post('/users/activate-all-pending', [UserManagementController::class, 'activateAllPending'])->name('users.activateAllPending');
     Route::post('/users/suspend-multiple', [UserManagementController::class, 'suspendMultiple'])->name('users.suspendMultiple');
 
-    // Product request management routes
+    // Enhanced product request management routes
     Route::get('/product-requests', [ProductRequestManagementController::class, 'index'])->name('product-requests.index');
     Route::get('/product-requests/{product}', [ProductRequestManagementController::class, 'show'])->name('product-requests.show');
     Route::post('/product-requests/{product}/approve', [ProductRequestManagementController::class, 'approve'])->name('product-requests.approve');
@@ -167,7 +157,7 @@ Route::middleware(['auth', 'check.role:cooperative_admin'])->prefix('coop')->nam
     Route::post('/admins/{admin}/reactivate', [CooperativeRequestManagementController::class, 'reactivateAdmin'])->name('admins.reactivate');
     Route::delete('/admins/{admin}/permanently-remove', [CooperativeRequestManagementController::class, 'permanentlyRemoveAdmin'])->name('admins.permanently-remove');
 
-    // Product management routes
+    // Enhanced product management routes
     Route::get('/products', [ProductManagementController::class, 'index'])->name('products.index');
     Route::get('/products/create', [ProductManagementController::class, 'create'])->name('products.create');
     Route::post('/products', [ProductManagementController::class, 'store'])->name('products.store');
@@ -176,12 +166,14 @@ Route::middleware(['auth', 'check.role:cooperative_admin'])->prefix('coop')->nam
     Route::post('/products/{product}/submit', [ProductManagementController::class, 'submit'])->name('products.submit');
     Route::delete('/products/{product}', [ProductManagementController::class, 'destroy'])->name('products.destroy');
     Route::get('/products/{product}', [ProductManagementController::class, 'show'])->name('products.show');
+
+    // New AJAX image management routes
+    Route::post('/products/{product}/manage-images', [ProductManagementController::class, 'manageImages'])->name('products.manage-images');
 });
 
 // ===== CLIENT ROUTES =====
 
 Route::middleware(['auth', 'check.role:client'])->prefix('client')->name('client.')->group(function () {
-
     // Client-specific routes can be added here
     // Example: Profile management, order history, etc.
 });
