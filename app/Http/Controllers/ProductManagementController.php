@@ -229,7 +229,32 @@ class ProductManagementController extends Controller
 
             DB::beginTransaction();
 
-            if ($product->isApproved() && !$product->isUpdatedVersion()) {
+            // Check if only stock_quantity is being updated (for approved products)
+            $isStockOnlyUpdate = false;
+            if ($product->isApproved() && $action !== 'submit') {
+                $currentData = [
+                    'category_id' => $product->category_id,
+                    'name' => $product->name,
+                    'description' => $product->description,
+                    'price' => floatval($product->price),
+                ];
+
+                $newData = [
+                    'category_id' => intval($validatedData['category_id']),
+                    'name' => $validatedData['name'],
+                    'description' => $validatedData['description'],
+                    'price' => floatval($validatedData['price']),
+                ];
+
+                $hasImageChanges = $request->hasFile('new_images') ||
+                                 ($request->has('removed_images') && !empty($request->removed_images));
+
+                // Check if only stock_quantity changed and no image changes
+                $isStockOnlyUpdate = ($currentData === $newData) && !$hasImageChanges;
+            }
+
+            // Store original data only if it's not a stock-only update
+            if ($product->isApproved() && !$product->isUpdatedVersion() && !$isStockOnlyUpdate) {
                 $product->load('category');
                 $product->storeOriginalData();
             }
@@ -260,10 +285,12 @@ class ProductManagementController extends Controller
                 $product->setPrimaryImage($request->primary_image_id);
             }
 
-            // Check if we have at least one image
-            $product->updateImagesCount();
-            if ($product->images_count === 0) {
-                throw new \Exception('Le produit doit avoir au moins une image.');
+            // Check if we have at least one image (only if not stock-only update)
+            if (!$isStockOnlyUpdate) {
+                $product->updateImagesCount();
+                if ($product->images_count === 0) {
+                    throw new \Exception('Le produit doit avoir au moins une image.');
+                }
             }
 
             // Update product
@@ -275,7 +302,7 @@ class ProductManagementController extends Controller
                 'stock_quantity' => $validatedData['stock_quantity'],
             ]);
 
-            // Update status based on action
+            // Update status based on action - BUT skip if it's a stock-only update
             if ($action === 'submit') {
                 $product->update([
                     'status' => 'pending',
@@ -285,7 +312,8 @@ class ProductManagementController extends Controller
                     'reviewed_at' => null,
                     'reviewed_by' => null,
                 ]);
-            } else if ($product->isApproved()) {
+            } else if ($product->isApproved() && !$isStockOnlyUpdate) {
+                // Only change status if it's NOT a stock-only update
                 $product->update([
                     'status' => 'pending',
                     'submitted_at' => now(),
@@ -294,15 +322,21 @@ class ProductManagementController extends Controller
                     'reviewed_at' => null,
                     'reviewed_by' => null,
                 ]);
-            } else {
+            } else if (!$product->isApproved()) {
                 $product->update(['status' => 'draft']);
             }
+            // If it's a stock-only update for an approved product, we don't change the status at all
 
             DB::commit();
 
-            $message = ($action === 'submit' || $product->wasChanged('status'))
-                ? 'Produit mis à jour et soumis pour ré-approbation!'
-                : 'Produit mis à jour!';
+            $message = '';
+            if ($isStockOnlyUpdate) {
+                $message = 'Stock mis à jour avec succès!';
+            } else if ($action === 'submit' || ($product->isApproved() && !$isStockOnlyUpdate)) {
+                $message = 'Produit mis à jour et soumis pour ré-approbation!';
+            } else {
+                $message = 'Produit mis à jour!';
+            }
 
             return response()->json([
                 'success' => true,
