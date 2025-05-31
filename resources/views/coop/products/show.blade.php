@@ -527,8 +527,11 @@
                                 10 unités (Produits populaires)
                             </button>
                             @if($product->stock_quantity > 10)
-                                <button type="button" class="btn btn-outline-info btn-sm" onclick="setThreshold({{ Math.floor($product->stock_quantity * 0.1) }})">
-                                    {{ Math.floor($product->stock_quantity * 0.1) }} unités (10% du stock actuel)
+                                @php
+                                    $suggestedThreshold = floor($product->stock_quantity * 0.1);
+                                @endphp
+                                <button type="button" class="btn btn-outline-info btn-sm" onclick="setThreshold({{ $suggestedThreshold }})">
+                                    {{ $suggestedThreshold }} unités (10% du stock actuel)
                                 </button>
                             @endif
                         </div>

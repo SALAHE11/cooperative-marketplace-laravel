@@ -404,9 +404,12 @@
                             <i class="fas fa-exclamation-triangle me-1"></i>
                             10 unités (Produits populaires)
                         </button>
-                        <button type="button" class="btn btn-outline-info" onclick="setQuickThreshold(Math.max(5, Math.floor({{ $product->stock_quantity }} * 0.1)))">
+                        @php
+                            $suggestedPercentage = max(5, floor($product->stock_quantity * 0.1));
+                        @endphp
+                        <button type="button" class="btn btn-outline-info" onclick="setQuickThreshold({{ $suggestedPercentage }})">
                             <i class="fas fa-percentage me-1"></i>
-                            {{ Math.max(5, Math.floor($product->stock_quantity * 0.1)) }} unités (10% du stock actuel)
+                            {{ $suggestedPercentage }} unités (10% du stock actuel)
                         </button>
                         <button type="button" class="btn btn-outline-danger" onclick="setQuickThreshold(1)">
                             <i class="fas fa-times-circle me-1"></i>
