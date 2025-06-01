@@ -14,7 +14,12 @@ use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\ProductManagementController;
 use App\Http\Controllers\Admin\ProductRequestManagementController;
-
+use App\Http\Controllers\Client\CartController;
+use App\Http\Controllers\Client\OrderController;
+use App\Http\Controllers\Coop\OrderManagementController;
+use App\Http\Controllers\Client\CheckoutController;
+use App\Http\Controllers\Client\ProductBrowsingController;
+use App\Http\Controllers\Client\ReceiptController;
 // ===== PUBLIC ROUTES =====
 
 // Home page
@@ -173,11 +178,42 @@ Route::middleware(['auth', 'check.role:cooperative_admin'])->prefix('coop')->nam
 
     // AJAX image management routes
     Route::post('/products/{product}/manage-images', [ProductManagementController::class, 'manageImages'])->name('products.manage-images');
+
+    // Order management
+    Route::get('/orders', [OrderManagementController::class, 'index'])->name('orders.index');
+    Route::get('/orders/{order}', [OrderManagementController::class, 'show'])->name('orders.show');
+    Route::post('/orders/{order}/update-status', [OrderManagementController::class, 'updateStatus'])->name('orders.update-status');
+    Route::post('/orders/{order}/mark-picked-up', [OrderManagementController::class, 'markPickedUp'])->name('orders.mark-picked-up');
 });
 
 // ===== CLIENT ROUTES =====
 
 Route::middleware(['auth', 'check.role:client'])->prefix('client')->name('client.')->group(function () {
-    // Client-specific routes can be added here
-    // Example: Profile management, order history, etc.
+
+    // Product browsing
+    Route::get('/products', [ProductBrowsingController::class, 'index'])->name('products.index');
+    Route::get('/products/{product}', [ProductBrowsingController::class, 'show'])->name('products.show');
+    Route::get('/products/search/ajax', [ProductBrowsingController::class, 'search'])->name('products.search');
+
+    // Cart management
+    Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
+    Route::post('/cart/add/{product}', [CartController::class, 'add'])->name('cart.add');
+    Route::post('/cart/update', [CartController::class, 'update'])->name('cart.update');
+    Route::post('/cart/remove', [CartController::class, 'remove'])->name('cart.remove');
+    Route::post('/cart/clear', [CartController::class, 'clear'])->name('cart.clear');
+    Route::get('/cart/count', [CartController::class, 'count'])->name('cart.count');
+
+    // Checkout
+    Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout.show');
+    Route::post('/checkout/process', [CheckoutController::class, 'process'])->name('checkout.process');
+    Route::get('/checkout/success', [CheckoutController::class, 'success'])->name('orders.success');
+
+    // Orders
+    Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
+    Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
+
+    // Receipts
+    Route::get('/receipts/client/{receipt}', [ReceiptController::class, 'downloadClientReceipt'])->name('receipts.client');
+    Route::get('/receipts/authorization/{authReceipt}', [ReceiptController::class, 'downloadAuthorizationReceipt'])->name('receipts.authorization');
+    Route::post('/receipts/{receipt}/create-authorization', [ReceiptController::class, 'createAuthorizationReceipt'])->name('receipts.create-authorization');
 });
