@@ -119,15 +119,6 @@ class OrderManagementController extends Controller
                 $updateData['notes'] = $request->notes;
             }
 
-            if ($request->status === 'ready' && !$order->ready_at) {
-                $updateData['ready_at'] = now();
-            }
-
-            if ($request->status === 'completed' && !$order->picked_up_at) {
-                $updateData['picked_up_at'] = now();
-                $updateData['picked_up_by'] = 'client'; // Default, can be updated later
-            }
-
             $order->update($updateData);
 
             return response()->json([
@@ -193,8 +184,6 @@ class OrderManagementController extends Controller
 
             $order->update([
                 'status' => 'completed',
-                'picked_up_at' => now(),
-                'picked_up_by' => $request->picked_up_by,
                 'notes' => $request->notes
             ]);
 

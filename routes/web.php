@@ -3,6 +3,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use App\Models\User;
 use App\Http\Controllers\ClientRegistrationController;
 use App\Http\Controllers\CoopRegistrationController;
 use App\Http\Controllers\CooperativeRequestManagementController;
@@ -20,66 +21,100 @@ use App\Http\Controllers\Coop\OrderManagementController;
 use App\Http\Controllers\Client\CheckoutController;
 use App\Http\Controllers\Client\ProductBrowsingController;
 use App\Http\Controllers\Client\ReceiptController;
-// ===== PUBLIC ROUTES =====
+
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register web routes for your application. These
+| routes are loaded by the RouteServiceProvider within a group which
+| contains the "web" middleware group. Now create something great!
+|
+*/
+
+// =============================================================================
+// PUBLIC ROUTES
+// =============================================================================
 
 // Home page
 Route::get('/', function () {
     return view('welcome');
 })->name('home');
 
-// ===== AUTHENTICATION ROUTES =====
+// =============================================================================
+// AUTHENTICATION ROUTES
+// =============================================================================
 
 // Login & Logout
 Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-// ===== PASSWORD RESET ROUTES =====
+// =============================================================================
+// PASSWORD RESET ROUTES
+// =============================================================================
 
-Route::get('/password/reset', [PasswordResetController::class, 'showForgotForm'])->name('password.request');
-Route::post('/password/send-code', [PasswordResetController::class, 'sendResetCode'])->name('password.send-code');
-Route::get('/password/verify-code', [PasswordResetController::class, 'showVerifyCodeForm'])->name('password.verify-code');
-Route::post('/password/verify-code', [PasswordResetController::class, 'verifyCode'])->name('password.verify-code.submit');
-Route::get('/password/new', [PasswordResetController::class, 'showNewPasswordForm'])->name('password.new');
-Route::post('/password/new', [PasswordResetController::class, 'setNewPassword'])->name('password.new.submit');
-Route::post('/password/resend-code', [PasswordResetController::class, 'resendCode'])->name('password.resend-code');
+Route::prefix('password')->name('password.')->group(function () {
+    Route::get('/reset', [PasswordResetController::class, 'showForgotForm'])->name('request');
+    Route::post('/send-code', [PasswordResetController::class, 'sendResetCode'])->name('send-code');
+    Route::get('/verify-code', [PasswordResetController::class, 'showVerifyCodeForm'])->name('verify-code');
+    Route::post('/verify-code', [PasswordResetController::class, 'verifyCode'])->name('verify-code.submit');
+    Route::get('/new', [PasswordResetController::class, 'showNewPasswordForm'])->name('new');
+    Route::post('/new', [PasswordResetController::class, 'setNewPassword'])->name('new.submit');
+    Route::post('/resend-code', [PasswordResetController::class, 'resendCode'])->name('resend-code');
+});
 
-// ===== CLIENT REGISTRATION ROUTES =====
+// =============================================================================
+// CLIENT REGISTRATION ROUTES
+// =============================================================================
 
-Route::get('/register/client', [ClientRegistrationController::class, 'showRegistrationForm'])->name('client.register');
-Route::post('/register/client', [ClientRegistrationController::class, 'register']);
-Route::get('/verify-email', [ClientRegistrationController::class, 'showVerifyEmailForm'])->name('client.verify-email');
-Route::post('/verify-email', [ClientRegistrationController::class, 'verifyEmail']);
+Route::prefix('register/client')->name('client.')->group(function () {
+    Route::get('/', [ClientRegistrationController::class, 'showRegistrationForm'])->name('register');
+    Route::post('/', [ClientRegistrationController::class, 'register']);
+    Route::get('/verify-email', [ClientRegistrationController::class, 'showVerifyEmailForm'])->name('verify-email');
+    Route::post('/verify-email', [ClientRegistrationController::class, 'verifyEmail']);
+});
 
-// ===== COOPERATIVE REGISTRATION ROUTES =====
+// =============================================================================
+// COOPERATIVE REGISTRATION ROUTES
+// =============================================================================
 
-// New cooperative registration
-Route::get('/register/cooperative', [CoopRegistrationController::class, 'showRegistrationForm'])->name('coop.register');
-Route::post('/register/cooperative', [CoopRegistrationController::class, 'register']);
-Route::get('/verify-coop-emails', [CoopRegistrationController::class, 'showVerifyEmailsForm'])->name('coop.verify-emails');
-Route::post('/verify-coop-emails', [CoopRegistrationController::class, 'verifyEmails']);
+Route::prefix('register/cooperative')->name('coop.')->group(function () {
+    // New cooperative registration
+    Route::get('/', [CoopRegistrationController::class, 'showRegistrationForm'])->name('register');
+    Route::post('/', [CoopRegistrationController::class, 'register']);
+    Route::get('/verify-emails', [CoopRegistrationController::class, 'showVerifyEmailsForm'])->name('verify-emails');
+    Route::post('/verify-emails', [CoopRegistrationController::class, 'verifyEmails']);
 
-// Cooperative search routes (for joining existing cooperative)
-Route::get('/cooperatives/search', [CoopRegistrationController::class, 'searchCooperatives'])->name('coop.search');
-Route::get('/cooperatives/{id}/details', [CoopRegistrationController::class, 'getCooperativeDetails'])->name('coop.details');
+    // Join existing cooperative
+    Route::get('/search', [CoopRegistrationController::class, 'searchCooperatives'])->name('search');
+    Route::get('/{id}/details', [CoopRegistrationController::class, 'getCooperativeDetails'])->name('details');
+    Route::get('/verify-join-request', [CoopRegistrationController::class, 'showVerifyJoinRequestForm'])->name('verify-join-request');
+    Route::post('/verify-join-request', [CoopRegistrationController::class, 'verifyJoinRequest']);
+    Route::get('/join-request-sent', [CoopRegistrationController::class, 'showJoinRequestSent'])->name('join-request-sent');
+});
 
-// Join request routes
-Route::get('/verify-join-request', [CoopRegistrationController::class, 'showVerifyJoinRequestForm'])->name('coop.verify-join-request');
-Route::post('/verify-join-request', [CoopRegistrationController::class, 'verifyJoinRequest']);
-Route::get('/join-request-sent', [CoopRegistrationController::class, 'showJoinRequestSent'])->name('coop.join-request-sent');
+// =============================================================================
+// ADMIN REGISTRATION ROUTES (PUBLIC - VIA INVITATION)
+// =============================================================================
 
-// ===== ADMIN REGISTRATION ROUTES (PUBLIC - ACCESSED VIA INVITATION LINK) =====
+Route::prefix('admin')->name('admin.')->group(function () {
+    Route::get('/register/{token}', [AdminInvitationController::class, 'showRegistrationForm'])->name('register');
+    Route::post('/register/{token}', [AdminInvitationController::class, 'register'])->name('register.submit');
+    Route::get('/verify-email', [AdminInvitationController::class, 'showVerifyEmailForm'])->name('verify-email');
+    Route::post('/verify-email', [AdminInvitationController::class, 'verifyEmail'])->name('verify-email.submit');
+});
 
-Route::get('/admin/register/{token}', [AdminInvitationController::class, 'showRegistrationForm'])->name('admin.register');
-Route::post('/admin/register/{token}', [AdminInvitationController::class, 'register'])->name('admin.register.submit');
-Route::get('/admin/verify-email', [AdminInvitationController::class, 'showVerifyEmailForm'])->name('admin.verify-email');
-Route::post('/admin/verify-email', [AdminInvitationController::class, 'verifyEmail'])->name('admin.verify-email.submit');
-
-// ===== PROTECTED ROUTES (REQUIRE AUTHENTICATION) =====
+// =============================================================================
+// PROTECTED ROUTES (REQUIRE AUTHENTICATION)
+// =============================================================================
 
 Route::middleware(['auth'])->group(function () {
 
-    // ===== DASHBOARD ROUTES =====
+    // =========================================================================
+    // DASHBOARD ROUTES
+    // =========================================================================
 
     Route::get('/admin/dashboard', [DashboardController::class, 'adminDashboard'])
          ->middleware('check.role:system_admin')
@@ -92,128 +127,185 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/client/dashboard', [DashboardController::class, 'clientDashboard'])
          ->middleware('check.role:client')
          ->name('client.dashboard');
+
+    // =========================================================================
+    // SYSTEM ADMIN ROUTES
+    // =========================================================================
+
+    Route::middleware(['check.role:system_admin'])->prefix('admin')->name('admin.')->group(function () {
+
+        // Admin invitation routes
+        Route::post('/send-invitation', [AdminInvitationController::class, 'sendInvitation'])->name('send-invitation');
+
+        // Cooperative management routes
+        Route::prefix('cooperatives')->name('cooperatives.')->group(function () {
+            Route::get('/', [CooperativeManagementController::class, 'index'])->name('index');
+            Route::get('/search', [CooperativeManagementController::class, 'search'])->name('search');
+            Route::get('/{cooperative}', [CooperativeManagementController::class, 'show'])->name('show');
+            Route::patch('/{cooperative}/approve', [CooperativeManagementController::class, 'approve'])->name('approve');
+            Route::patch('/{cooperative}/reject', [CooperativeManagementController::class, 'reject'])->name('reject');
+            Route::post('/{cooperative}/request-info', [CooperativeManagementController::class, 'requestInfo'])->name('request-info');
+            Route::patch('/{cooperative}/suspend', [CooperativeManagementController::class, 'suspend'])->name('suspend');
+            Route::patch('/{cooperative}/unsuspend', [CooperativeManagementController::class, 'unsuspend'])->name('unsuspend');
+        });
+
+        // Email management
+        Route::post('/send-email', [CooperativeManagementController::class, 'sendEmail'])->name('send-email');
+
+        // Category management routes
+        Route::prefix('categories')->name('categories.')->group(function () {
+            Route::get('/', [CategoryManagementController::class, 'index'])->name('index');
+            Route::post('/', [CategoryManagementController::class, 'store'])->name('store');
+            Route::put('/{category}', [CategoryManagementController::class, 'update'])->name('update');
+            Route::delete('/{category}', [CategoryManagementController::class, 'destroy'])->name('destroy');
+            Route::get('/ajax', [CategoryManagementController::class, 'getCategoriesAjax'])->name('ajax');
+
+            // Category hierarchy routes
+            Route::get('/tree', [CategoryManagementController::class, 'getTreeData'])->name('tree');
+            Route::post('/{category}/move', [CategoryManagementController::class, 'moveCategory'])->name('move');
+            Route::post('/reorder', [CategoryManagementController::class, 'reorderCategories'])->name('reorder');
+            Route::get('/breadcrumb/{category}', [CategoryManagementController::class, 'getBreadcrumb'])->name('breadcrumb');
+        });
+
+        // User management routes
+        Route::prefix('users')->name('users.')->group(function () {
+            Route::get('/', [UserManagementController::class, 'index'])->name('index');
+            Route::get('/{user}', [UserManagementController::class, 'show'])->name('show');
+            Route::patch('/{user}/status', [UserManagementController::class, 'updateStatus'])->name('updateStatus');
+            Route::post('/activate-all-pending', [UserManagementController::class, 'activateAllPending'])->name('activateAllPending');
+            Route::post('/suspend-multiple', [UserManagementController::class, 'suspendMultiple'])->name('suspendMultiple');
+        });
+
+        // Product request management routes
+        Route::prefix('product-requests')->name('product-requests.')->group(function () {
+            Route::get('/', [ProductRequestManagementController::class, 'index'])->name('index');
+            Route::get('/{product}', [ProductRequestManagementController::class, 'show'])->name('show');
+            Route::post('/{product}/approve', [ProductRequestManagementController::class, 'approve'])->name('approve');
+            Route::post('/{product}/reject', [ProductRequestManagementController::class, 'reject'])->name('reject');
+            Route::post('/{product}/request-info', [ProductRequestManagementController::class, 'requestInfo'])->name('request-info');
+            Route::get('/{product}/images', [ProductRequestManagementController::class, 'getImages'])->name('images');
+        });
+
+    });
+
+    // =========================================================================
+    // COOPERATIVE ADMIN ROUTES
+    // =========================================================================
+
+    Route::middleware(['check.role:cooperative_admin'])->prefix('coop')->name('coop.')->group(function () {
+
+        // Admin request management routes (PRIMARY ADMIN ONLY)
+        Route::prefix('admin-requests')->name('admin-requests.')->group(function () {
+            Route::get('/pending', [CooperativeRequestManagementController::class, 'getPendingRequests'])->name('pending');
+            Route::get('/current-admins', [CooperativeRequestManagementController::class, 'getCurrentAdmins'])->name('current-admins');
+            Route::get('/inactive-admins', [CooperativeRequestManagementController::class, 'getInactiveAdmins'])->name('inactive-admins');
+
+            // Request action routes
+            Route::post('/{request}/approve', [CooperativeRequestManagementController::class, 'approveRequest'])->name('approve');
+            Route::post('/{request}/reject', [CooperativeRequestManagementController::class, 'rejectRequest'])->name('reject');
+            Route::post('/{request}/clarification', [CooperativeRequestManagementController::class, 'requestClarification'])->name('clarification');
+        });
+
+        // Admin management routes (PRIMARY ADMIN ONLY)
+        Route::prefix('admins')->name('admins.')->group(function () {
+            Route::delete('/{admin}/remove', [CooperativeRequestManagementController::class, 'removeAdmin'])->name('remove');
+            Route::post('/{admin}/reactivate', [CooperativeRequestManagementController::class, 'reactivateAdmin'])->name('reactivate');
+            Route::delete('/{admin}/permanently-remove', [CooperativeRequestManagementController::class, 'permanentlyRemoveAdmin'])->name('permanently-remove');
+        });
+
+        // Product management routes
+        Route::prefix('products')->name('products.')->group(function () {
+            Route::get('/', [ProductManagementController::class, 'index'])->name('index');
+            Route::get('/create', [ProductManagementController::class, 'create'])->name('create');
+            Route::post('/', [ProductManagementController::class, 'store'])->name('store');
+            Route::get('/{product}/edit', [ProductManagementController::class, 'edit'])->name('edit');
+            Route::put('/{product}', [ProductManagementController::class, 'update'])->name('update');
+            Route::post('/{product}/submit', [ProductManagementController::class, 'submit'])->name('submit');
+            Route::delete('/{product}', [ProductManagementController::class, 'destroy'])->name('destroy');
+            Route::get('/{product}', [ProductManagementController::class, 'show'])->name('show');
+
+            // Stock alert configuration routes
+            Route::post('/{product}/configure-stock-alert', [ProductManagementController::class, 'configureStockAlert'])->name('configure-stock-alert');
+            Route::post('/bulk-configure-stock-alerts', [ProductManagementController::class, 'bulkConfigureStockAlerts'])->name('bulk-configure-stock-alerts');
+
+            // Image management routes
+            Route::post('/{product}/manage-images', [ProductManagementController::class, 'manageImages'])->name('manage-images');
+        });
+
+        // Order management routes
+        Route::prefix('orders')->name('orders.')->group(function () {
+            Route::get('/', [OrderManagementController::class, 'index'])->name('index');
+            Route::get('/{order}', [OrderManagementController::class, 'show'])->name('show');
+            Route::post('/{order}/update-status', [OrderManagementController::class, 'updateStatus'])->name('update-status');
+            Route::post('/{order}/mark-picked-up', [OrderManagementController::class, 'markPickedUp'])->name('mark-picked-up');
+        });
+
+    });
+
+    // =========================================================================
+    // CLIENT ROUTES
+    // =========================================================================
+
+    Route::middleware(['check.role:client'])->prefix('client')->name('client.')->group(function () {
+
+        // Product browsing routes
+        Route::prefix('products')->name('products.')->group(function () {
+            Route::get('/', [ProductBrowsingController::class, 'index'])->name('index');
+            Route::get('/{product}', [ProductBrowsingController::class, 'show'])->name('show');
+            Route::get('/search/ajax', [ProductBrowsingController::class, 'search'])->name('search');
+        });
+
+        // Cart management routes
+        Route::prefix('cart')->name('cart.')->group(function () {
+            Route::get('/', [CartController::class, 'index'])->name('index');
+            Route::post('/add/{product}', [CartController::class, 'add'])->name('add');
+            Route::post('/update', [CartController::class, 'update'])->name('update');
+            Route::post('/remove', [CartController::class, 'remove'])->name('remove');
+            Route::post('/clear', [CartController::class, 'clear'])->name('clear');
+            Route::get('/count', [CartController::class, 'count'])->name('count');
+        });
+
+        // Checkout routes
+        Route::prefix('checkout')->name('checkout.')->group(function () {
+            Route::get('/', [CheckoutController::class, 'show'])->name('show');
+            Route::post('/process', [CheckoutController::class, 'process'])->name('process');
+            Route::get('/success', [CheckoutController::class, 'success'])->name('success');
+        });
+
+        // Order routes
+        Route::prefix('orders')->name('orders.')->group(function () {
+            Route::get('/', [OrderController::class, 'index'])->name('index');
+            Route::get('/{order}', [OrderController::class, 'show'])->name('show');
+            Route::get('/success', [CheckoutController::class, 'success'])->name('success');
+        });
+
+        // Receipt routes
+        Route::prefix('receipts')->name('receipts.')->group(function () {
+            Route::get('/client/{receipt}', [ReceiptController::class, 'downloadClientReceipt'])->name('client');
+            Route::get('/authorization/{authReceipt}', [ReceiptController::class, 'downloadAuthorizationReceipt'])->name('authorization');
+            Route::post('/{receipt}/create-authorization', [ReceiptController::class, 'createAuthorizationReceipt'])->name('create-authorization');
+        });
+
+    });
+
+    // =========================================================================
+    // API ROUTES FOR DASHBOARD STATS
+    // =========================================================================
+
+    Route::prefix('api')->name('api.')->group(function () {
+        Route::get('/dashboard/stats', [DashboardController::class, 'getStats'])->name('dashboard.stats');
+        Route::get('/dashboard/insights', [DashboardController::class, 'getQuickInsights'])->name('dashboard.insights');
+    });
+
 });
 
-// ===== SYSTEM ADMIN ROUTES =====
+// =============================================================================
+// FALLBACK ROUTES
+// =============================================================================
 
-Route::middleware(['auth', 'check.role:system_admin'])->prefix('admin')->name('admin.')->group(function () {
 
-    // Admin invitation routes
-    Route::post('/send-invitation', [AdminInvitationController::class, 'sendInvitation'])->name('send-invitation');
 
-    // Cooperative management routes
-    Route::get('/cooperatives', [CooperativeManagementController::class, 'index'])->name('cooperatives.index');
-    Route::get('/cooperatives/search', [CooperativeManagementController::class, 'search'])->name('cooperatives.search');
-    Route::get('/cooperatives/{cooperative}', [CooperativeManagementController::class, 'show'])->name('cooperatives.show');
-    Route::patch('/cooperatives/{cooperative}/approve', [CooperativeManagementController::class, 'approve'])->name('cooperatives.approve');
-    Route::patch('/cooperatives/{cooperative}/reject', [CooperativeManagementController::class, 'reject'])->name('cooperatives.reject');
-    Route::post('/cooperatives/{cooperative}/request-info', [CooperativeManagementController::class, 'requestInfo'])->name('cooperatives.request-info');
-    Route::post('/send-email', [CooperativeManagementController::class, 'sendEmail'])->name('send-email');
-    Route::patch('/cooperatives/{cooperative}/suspend', [CooperativeManagementController::class, 'suspend'])->name('cooperatives.suspend');
-    Route::patch('/cooperatives/{cooperative}/unsuspend', [CooperativeManagementController::class, 'unsuspend'])->name('cooperatives.unsuspend');
-
-    // Category management routes
-    Route::get('/categories', [CategoryManagementController::class, 'index'])->name('categories.index');
-    Route::post('/categories', [CategoryManagementController::class, 'store'])->name('categories.store');
-    Route::put('/categories/{category}', [CategoryManagementController::class, 'update'])->name('categories.update');
-    Route::delete('/categories/{category}', [CategoryManagementController::class, 'destroy'])->name('categories.destroy');
-    Route::get('/categories/ajax', [CategoryManagementController::class, 'getCategoriesAjax'])->name('categories.ajax');
-
-    // Category hierarchy routes
-    Route::get('/categories/tree', [CategoryManagementController::class, 'getTreeData'])->name('categories.tree');
-    Route::post('/categories/{category}/move', [CategoryManagementController::class, 'moveCategory'])->name('categories.move');
-    Route::post('/categories/reorder', [CategoryManagementController::class, 'reorderCategories'])->name('categories.reorder');
-    Route::get('/categories/breadcrumb/{category}', [CategoryManagementController::class, 'getBreadcrumb'])->name('categories.breadcrumb');
-
-    // User management routes
-    Route::get('/users', [UserManagementController::class, 'index'])->name('users.index');
-    Route::get('/users/{user}', [UserManagementController::class, 'show'])->name('users.show');
-    Route::patch('/users/{user}/status', [UserManagementController::class, 'updateStatus'])->name('users.updateStatus');
-    Route::post('/users/activate-all-pending', [UserManagementController::class, 'activateAllPending'])->name('users.activateAllPending');
-    Route::post('/users/suspend-multiple', [UserManagementController::class, 'suspendMultiple'])->name('users.suspendMultiple');
-
-    // Enhanced product request management routes
-    Route::get('/product-requests', [ProductRequestManagementController::class, 'index'])->name('product-requests.index');
-    Route::get('/product-requests/{product}', [ProductRequestManagementController::class, 'show'])->name('product-requests.show');
-    Route::post('/product-requests/{product}/approve', [ProductRequestManagementController::class, 'approve'])->name('product-requests.approve');
-    Route::post('/product-requests/{product}/reject', [ProductRequestManagementController::class, 'reject'])->name('product-requests.reject');
-    Route::post('/product-requests/{product}/request-info', [ProductRequestManagementController::class, 'requestInfo'])->name('product-requests.request-info');
-    Route::get('/product-requests/{product}/images', [ProductRequestManagementController::class, 'getImages'])->name('product-requests.images');
-});
-
-// ===== COOPERATIVE ADMIN ROUTES =====
-
-Route::middleware(['auth', 'check.role:cooperative_admin'])->prefix('coop')->name('coop.')->group(function () {
-
-    // ===== ADMIN REQUEST MANAGEMENT ROUTES =====
-
-    // Get data routes
-    Route::get('/admin-requests/pending', [CooperativeRequestManagementController::class, 'getPendingRequests'])->name('admin-requests.pending');
-    Route::get('/admin-requests/current-admins', [CooperativeRequestManagementController::class, 'getCurrentAdmins'])->name('admin-requests.current-admins');
-    Route::get('/admin-requests/inactive-admins', [CooperativeRequestManagementController::class, 'getInactiveAdmins'])->name('admin-requests.inactive-admins');
-
-    // Request action routes
-    Route::post('/admin-requests/{request}/approve', [CooperativeRequestManagementController::class, 'approveRequest'])->name('admin-requests.approve');
-    Route::post('/admin-requests/{request}/reject', [CooperativeRequestManagementController::class, 'rejectRequest'])->name('admin-requests.reject');
-    Route::post('/admin-requests/{request}/clarification', [CooperativeRequestManagementController::class, 'requestClarification'])->name('admin-requests.clarification');
-
-    // Admin management routes
-    Route::delete('/admins/{admin}/remove', [CooperativeRequestManagementController::class, 'removeAdmin'])->name('admins.remove');
-    Route::post('/admins/{admin}/reactivate', [CooperativeRequestManagementController::class, 'reactivateAdmin'])->name('admins.reactivate');
-    Route::delete('/admins/{admin}/permanently-remove', [CooperativeRequestManagementController::class, 'permanentlyRemoveAdmin'])->name('admins.permanently-remove');
-
-    // Enhanced product management routes
-    Route::get('/products', [ProductManagementController::class, 'index'])->name('products.index');
-    Route::get('/products/create', [ProductManagementController::class, 'create'])->name('products.create');
-    Route::post('/products', [ProductManagementController::class, 'store'])->name('products.store');
-    Route::get('/products/{product}/edit', [ProductManagementController::class, 'edit'])->name('products.edit');
-    Route::put('/products/{product}', [ProductManagementController::class, 'update'])->name('products.update');
-    Route::post('/products/{product}/submit', [ProductManagementController::class, 'submit'])->name('products.submit');
-    Route::delete('/products/{product}', [ProductManagementController::class, 'destroy'])->name('products.destroy');
-    Route::get('/products/{product}', [ProductManagementController::class, 'show'])->name('products.show');
-
-    // NEW: Stock Alert Configuration Routes
-    Route::post('/products/{product}/configure-stock-alert', [ProductManagementController::class, 'configureStockAlert'])->name('products.configure-stock-alert');
-    Route::post('/products/bulk-configure-stock-alerts', [ProductManagementController::class, 'bulkConfigureStockAlerts'])->name('products.bulk-configure-stock-alerts');
-
-    // AJAX image management routes
-    Route::post('/products/{product}/manage-images', [ProductManagementController::class, 'manageImages'])->name('products.manage-images');
-
-    // Order management
-    Route::get('/orders', [OrderManagementController::class, 'index'])->name('orders.index');
-    Route::get('/orders/{order}', [OrderManagementController::class, 'show'])->name('orders.show');
-    Route::post('/orders/{order}/update-status', [OrderManagementController::class, 'updateStatus'])->name('orders.update-status');
-    Route::post('/orders/{order}/mark-picked-up', [OrderManagementController::class, 'markPickedUp'])->name('orders.mark-picked-up');
-});
-
-// ===== CLIENT ROUTES =====
-
-Route::middleware(['auth', 'check.role:client'])->prefix('client')->name('client.')->group(function () {
-
-    // Product browsing
-    Route::get('/products', [ProductBrowsingController::class, 'index'])->name('products.index');
-    Route::get('/products/{product}', [ProductBrowsingController::class, 'show'])->name('products.show');
-    Route::get('/products/search/ajax', [ProductBrowsingController::class, 'search'])->name('products.search');
-
-    // Cart management
-    Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
-    Route::post('/cart/add/{product}', [CartController::class, 'add'])->name('cart.add');
-    Route::post('/cart/update', [CartController::class, 'update'])->name('cart.update');
-    Route::post('/cart/remove', [CartController::class, 'remove'])->name('cart.remove');
-    Route::post('/cart/clear', [CartController::class, 'clear'])->name('cart.clear');
-    Route::get('/cart/count', [CartController::class, 'count'])->name('cart.count');
-
-    // Checkout
-    Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout.show');
-    Route::post('/checkout/process', [CheckoutController::class, 'process'])->name('checkout.process');
-    Route::get('/checkout/success', [CheckoutController::class, 'success'])->name('orders.success');
-
-    // Orders
-    Route::get('/orders', [OrderController::class, 'index'])->name('orders.index');
-    Route::get('/orders/{order}', [OrderController::class, 'show'])->name('orders.show');
-
-    // Receipts
-    Route::get('/receipts/client/{receipt}', [ReceiptController::class, 'downloadClientReceipt'])->name('receipts.client');
-    Route::get('/receipts/authorization/{authReceipt}', [ReceiptController::class, 'downloadAuthorizationReceipt'])->name('receipts.authorization');
-    Route::post('/receipts/{receipt}/create-authorization', [ReceiptController::class, 'createAuthorizationReceipt'])->name('receipts.create-authorization');
+// Handle undefined routes
+Route::fallback(function () {
+    return response()->view('errors.404', [], 404);
 });

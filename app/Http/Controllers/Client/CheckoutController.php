@@ -81,8 +81,6 @@ class CheckoutController extends Controller
 
             $user = Auth::user();
             $itemsByCooperative = $cart->getItemsByCooperative();
-
-            // FIXED: Initialize as Collection instead of array
             $orders = collect();
             $clientReceipts = collect();
 
@@ -94,20 +92,16 @@ class CheckoutController extends Controller
                 // Simulate payment processing
                 $paymentReference = $this->simulatePayment($request->payment_method, $orderTotal);
 
-                // Create order
+                // Create order using only existing fields
                 $order = Order::create([
                     'user_id' => $user->id,
                     'order_number' => $this->generateOrderNumber(),
                     'status' => 'pending',
                     'total_amount' => $orderTotal,
                     'shipping_address' => $user->address ?? '',
-                    'pickup_location' => $cooperative->address,
-                    'pickup_instructions' => $request->pickup_instructions,
                     'payment_method' => $request->payment_method,
                     'payment_status' => 'paid',
-                    'client_phone' => $request->client_phone,
-                    'estimated_ready_at' => now()->addHours(2), // Default 2 hours
-                    'notes' => 'Commande passée via la plateforme'
+                    'notes' => $request->pickup_instructions ?: 'Commande passée via la plateforme'
                 ]);
 
                 // Create order items
@@ -125,7 +119,7 @@ class CheckoutController extends Controller
                     $item->product->decrement('stock_quantity', $item->quantity);
                 }
 
-                // Create client receipt
+                // Create client receipt using only existing fields
                 $clientReceipt = ClientReceipt::create([
                     'receipt_number' => $this->generateReceiptNumber(),
                     'order_id' => $order->id,
@@ -134,13 +128,9 @@ class CheckoutController extends Controller
                     'total_amount' => $orderTotal,
                     'verification_code' => $this->generateVerificationCode(),
                     'qr_code_data' => $this->generateQRCodeData($order, $user),
-                    'payment_method' => $request->payment_method,
-                    'payment_reference' => $paymentReference,
-                    'issued_at' => now(),
                     'is_void' => false
                 ]);
 
-                // FIXED: Use Collection methods instead of array assignment
                 $orders->push($order);
                 $clientReceipts->push($clientReceipt);
 
@@ -168,8 +158,8 @@ class CheckoutController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Commande(s) passée(s) avec succès!',
-                'orders' => $orders->pluck('id'), // Now this works correctly
-                'redirect' => route('client.orders.success', ['orders' => $orders->pluck('id')->implode(',')])
+                'orders' => $orders->pluck('id'),
+                'redirect' => route('client.checkout.success', ['orders' => $orders->pluck('id')->implode(',')])
             ]);
 
         } catch (\Exception $e) {
@@ -199,7 +189,6 @@ class CheckoutController extends Controller
 
     private function simulatePayment($method, $amount)
     {
-        // Simulate payment processing - this is just for demo
         switch ($method) {
             case 'card':
                 return 'CARD_' . strtoupper(Str::random(10));
