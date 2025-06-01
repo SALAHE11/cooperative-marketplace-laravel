@@ -390,6 +390,7 @@ class DashboardController extends Controller
      */
     public function getStats(Request $request)
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
         $type = $request->get('type', 'overview');
 
@@ -469,6 +470,7 @@ class DashboardController extends Controller
      */
     private function getClientStats($type)
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
         $stats = [];
 
