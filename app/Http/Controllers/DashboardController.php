@@ -240,7 +240,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * Client Dashboard
+     * Client Dashboard - Enhanced Version
      */
     public function clientDashboard()
     {
@@ -290,7 +290,7 @@ class DashboardController extends Controller
             $stats['cart']['total'] = $cart->total_amount;
         }
 
-        // Get recent products (last 7 days) and featured products
+        // Get featured products - prioritize recent products from last 7 days
         $recentProducts = Product::with(['cooperative', 'category', 'primaryImage'])
             ->where('status', 'approved')
             ->where('is_active', true)
@@ -311,6 +311,7 @@ class DashboardController extends Controller
                 ->whereHas('cooperative', function($query) {
                     $query->where('status', 'approved');
                 })
+                ->where('stock_quantity', '>', 0) // Prioritize in-stock products
                 ->inRandomOrder()
                 ->take(8 - $recentProducts->count())
                 ->get();
@@ -330,26 +331,123 @@ class DashboardController extends Controller
             ->take(6)
             ->get();
 
-        // Get user's recent orders
+        // Get user's recent orders with enhanced data
         $recentOrders = $user->orders()
-            ->with(['orderItems.product.primaryImage', 'orderItems.cooperative'])
+            ->with([
+                'orderItems.product.primaryImage',
+                'orderItems.cooperative',
+                'clientReceipt.authorizationReceipts'
+            ])
             ->orderBy('created_at', 'desc')
             ->take(5)
             ->get();
 
-        // Get popular categories
-        $popularCategories = Category::withCount(['products' => function($query) {
-                $query->where('status', 'approved')->where('is_active', true);
-            }])
+        // Get popular categories based on product count and recent activity
+        $popularCategories = Category::withCount([
+                'products' => function($query) {
+                    $query->where('status', 'approved')
+                          ->where('is_active', true)
+                          ->whereHas('cooperative', function($q) {
+                              $q->where('status', 'approved');
+                          });
+                }
+            ])
             ->having('products_count', '>', 0)
             ->orderBy('products_count', 'desc')
             ->take(6)
             ->get();
 
+        // Calculate additional metrics for better insights
+        $additionalMetrics = [
+            'avg_order_value' => $user->orders()->where('payment_status', 'paid')->avg('total_amount') ?: 0,
+            'orders_this_month' => $user->orders()->whereMonth('created_at', now()->month)->count(),
+            'last_order_date' => $user->orders()->latest()->first()?->created_at,
+            'favorite_cooperative' => $this->getUserFavoriteCooperative($user),
+            'most_bought_category' => $this->getUserMostBoughtCategory($user),
+        ];
+
         return view('dashboards.client', compact(
             'stats', 'featuredProducts', 'activeCooperatives',
-            'recentOrders', 'popularCategories', 'cart'
+            'recentOrders', 'popularCategories', 'cart', 'additionalMetrics'
         ));
+    }
+
+    /**
+     * Get user's favorite cooperative based on order frequency
+     */
+    private function getUserFavoriteCooperative(User $user)
+    {
+        $cooperativeOrderCount = $user->orders()
+            ->with('orderItems.cooperative')
+            ->get()
+            ->flatMap(function($order) {
+                return $order->orderItems->pluck('cooperative');
+            })
+            ->groupBy('id')
+            ->map(function($cooperatives) {
+                return $cooperatives->count();
+            })
+            ->sortDesc()
+            ->first();
+
+        if ($cooperativeOrderCount) {
+            $cooperativeId = $user->orders()
+                ->with('orderItems.cooperative')
+                ->get()
+                ->flatMap(function($order) {
+                    return $order->orderItems->pluck('cooperative');
+                })
+                ->groupBy('id')
+                ->map(function($cooperatives) {
+                    return $cooperatives->count();
+                })
+                ->sortDesc()
+                ->keys()
+                ->first();
+
+            return Cooperative::find($cooperativeId);
+        }
+
+        return null;
+    }
+
+    /**
+     * Get user's most bought category
+     */
+    private function getUserMostBoughtCategory(User $user)
+    {
+        $categoryOrderCount = $user->orders()
+            ->with('orderItems.product.category')
+            ->get()
+            ->flatMap(function($order) {
+                return $order->orderItems->pluck('product.category')->filter();
+            })
+            ->groupBy('id')
+            ->map(function($categories) {
+                return $categories->count();
+            })
+            ->sortDesc()
+            ->first();
+
+        if ($categoryOrderCount) {
+            $categoryId = $user->orders()
+                ->with('orderItems.product.category')
+                ->get()
+                ->flatMap(function($order) {
+                    return $order->orderItems->pluck('product.category')->filter();
+                })
+                ->groupBy('id')
+                ->map(function($categories) {
+                    return $categories->count();
+                })
+                ->sortDesc()
+                ->keys()
+                ->first();
+
+            return Category::find($categoryId);
+        }
+
+        return null;
     }
 
     /**
@@ -429,6 +527,17 @@ class DashboardController extends Controller
                     'users' => $this->getMonthlyStats(User::class),
                 ];
                 break;
+
+            case 'real_time':
+                $stats = [
+                    'orders_today' => Order::whereDate('created_at', today())->count(),
+                    'revenue_today' => Order::where('payment_status', 'paid')
+                        ->whereDate('created_at', today())
+                        ->sum('total_amount'),
+                    'new_users_today' => User::whereDate('created_at', today())->count(),
+                    'active_cooperatives' => Cooperative::where('status', 'approved')->count(),
+                ];
+                break;
         }
 
         return response()->json($stats);
@@ -460,6 +569,21 @@ class DashboardController extends Controller
                     })->where('payment_status', 'paid')->sum('total_amount'),
                 ];
                 break;
+
+            case 'products':
+                $stats = [
+                    'approved' => $cooperative->products()->where('status', 'approved')->count(),
+                    'pending' => $cooperative->products()->where('status', 'pending')->count(),
+                    'low_stock' => $cooperative->products()
+                        ->where('status', 'approved')
+                        ->whereRaw('stock_quantity <= stock_alert_threshold')
+                        ->count(),
+                    'out_of_stock' => $cooperative->products()
+                        ->where('status', 'approved')
+                        ->where('stock_quantity', 0)
+                        ->count(),
+                ];
+                break;
         }
 
         return response()->json($stats);
@@ -479,10 +603,58 @@ class DashboardController extends Controller
                 $stats = [
                     'orders' => $user->orders()->count(),
                     'spending' => $user->orders()->where('payment_status', 'paid')->sum('total_amount'),
+                    'cart_items' => Cart::where('user_id', $user->id)->first()?->total_items ?? 0,
+                ];
+                break;
+
+            case 'orders':
+                $stats = [
+                    'pending' => $user->orders()->where('status', 'pending')->count(),
+                    'ready' => $user->orders()->where('status', 'ready')->count(),
+                    'completed' => $user->orders()->where('status', 'completed')->count(),
+                    'cancelled' => $user->orders()->where('status', 'cancelled')->count(),
+                ];
+                break;
+
+            case 'spending':
+                $stats = [
+                    'this_month' => $user->orders()
+                        ->where('payment_status', 'paid')
+                        ->whereMonth('created_at', now()->month)
+                        ->sum('total_amount'),
+                    'last_month' => $user->orders()
+                        ->where('payment_status', 'paid')
+                        ->whereMonth('created_at', now()->subMonth()->month)
+                        ->sum('total_amount'),
+                    'average_order' => $user->orders()
+                        ->where('payment_status', 'paid')
+                        ->avg('total_amount'),
                 ];
                 break;
         }
 
         return response()->json($stats);
+    }
+
+    /**
+     * Get quick insights for dashboard widgets
+     */
+    public function getQuickInsights(Request $request)
+    {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
+        if ($user->isClient()) {
+            $cart = Cart::where('user_id', $user->id)->first();
+
+            return response()->json([
+                'cart_count' => $cart ? $cart->total_items : 0,
+                'cart_total' => $cart ? $cart->total_amount : 0,
+                'pending_orders' => $user->orders()->where('status', 'pending')->count(),
+                'ready_orders' => $user->orders()->where('status', 'ready')->count(),
+            ]);
+        }
+
+        return response()->json(['error' => 'Unauthorized'], 403);
     }
 }

@@ -2,77 +2,6 @@
 
 @section('title', 'Mon Panier - Coopérative E-commerce')
 
-@push('styles')
-<style>
-.cart-item {
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    margin-bottom: 15px;
-    padding: 15px;
-    background: white;
-}
-
-.cart-item img {
-    width: 80px;
-    height: 80px;
-    object-fit: cover;
-    border-radius: 8px;
-}
-
-.cart-item-placeholder {
-    width: 80px;
-    height: 80px;
-    background: #f8f9fa;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.quantity-controls {
-    display: flex;
-    align-items: center;
-    border: 1px solid #dee2e6;
-    border-radius: 5px;
-    overflow: hidden;
-}
-
-.quantity-controls button {
-    border: none;
-    background: #f8f9fa;
-    padding: 5px 10px;
-    cursor: pointer;
-}
-
-.quantity-controls button:hover {
-    background: #e9ecef;
-}
-
-.quantity-controls input {
-    border: none;
-    text-align: center;
-    width: 60px;
-    padding: 5px;
-}
-
-.cooperative-section {
-    border: 2px solid #007bff;
-    border-radius: 10px;
-    padding: 20px;
-    margin-bottom: 20px;
-    background: #f8f9ff;
-}
-
-.cooperative-header {
-    background: #007bff;
-    color: white;
-    padding: 10px 15px;
-    margin: -20px -20px 15px -20px;
-    border-radius: 8px 8px 0 0;
-}
-</style>
-@endpush
-
 @section('content')
 <div class="container py-4">
     <div class="row">
@@ -82,10 +11,16 @@
                     <i class="fas fa-shopping-cart me-2"></i>
                     Mon Panier
                 </h1>
-                <a href="{{ route('client.products.index') }}" class="btn btn-outline-primary">
-                    <i class="fas fa-arrow-left me-1"></i>
-                    Continuer mes achats
-                </a>
+                <div class="d-flex gap-2">
+                    <a href="{{ route('client.dashboard') }}" class="btn btn-outline-primary">
+                        <i class="fas fa-home me-1"></i>
+                        Accueil
+                    </a>
+                    <a href="{{ route('client.products.index') }}" class="btn btn-primary">
+                        <i class="fas fa-search me-1"></i>
+                        Continuer mes achats
+                    </a>
+                </div>
             </div>
         </div>
     </div>
@@ -95,22 +30,23 @@
             <div class="col-lg-8">
                 @foreach($itemsByCooperative as $cooperativeId => $items)
                     @php $cooperative = $items->first()->cooperative; @endphp
-                    <div class="cooperative-section">
-                        <div class="cooperative-header">
+                    <div class="card mb-4 shadow">
+                        <div class="card-header bg-primary text-white">
                             <h5 class="mb-0">
                                 <i class="fas fa-building me-2"></i>
                                 {{ $cooperative->name }}
                             </h5>
                         </div>
-
-                        @foreach($items as $item)
-                            <div class="cart-item" data-product-id="{{ $item->product_id }}">
-                                <div class="row align-items-center">
+                        <div class="card-body">
+                            @foreach($items as $item)
+                                <div class="row align-items-center border-bottom py-3" data-product-id="{{ $item->product_id }}">
                                     <div class="col-auto">
                                         @if($item->getProductImage())
-                                            <img src="{{ $item->getProductImage() }}" alt="{{ $item->getProductName() }}">
+                                            <img src="{{ $item->getProductImage() }}" alt="{{ $item->getProductName() }}"
+                                                 class="rounded" style="width: 80px; height: 80px; object-fit: cover;">
                                         @else
-                                            <div class="cart-item-placeholder">
+                                            <div class="bg-light rounded d-flex align-items-center justify-content-center"
+                                                 style="width: 80px; height: 80px;">
                                                 <i class="fas fa-image text-muted"></i>
                                             </div>
                                         @endif
@@ -124,12 +60,12 @@
                                         <div class="text-success fw-bold">{{ number_format($item->unit_price, 2) }} MAD</div>
 
                                         @if(!$item->isAvailable())
-                                            <div class="alert alert-warning alert-sm mt-2">
+                                            <div class="alert alert-warning alert-sm mt-2 py-1">
                                                 <i class="fas fa-exclamation-triangle me-1"></i>
                                                 Ce produit n'est plus disponible
                                             </div>
                                         @elseif($item->product && $item->product->stock_quantity < $item->quantity)
-                                            <div class="alert alert-warning alert-sm mt-2">
+                                            <div class="alert alert-warning alert-sm mt-2 py-1">
                                                 <i class="fas fa-exclamation-triangle me-1"></i>
                                                 Stock insuffisant ({{ $item->product->stock_quantity }} disponible(s))
                                             </div>
@@ -137,13 +73,17 @@
                                     </div>
 
                                     <div class="col-auto">
-                                        <div class="quantity-controls">
-                                            <button type="button" onclick="updateQuantity({{ $item->product_id }}, {{ $item->quantity - 1 }})">
+                                        <div class="d-flex align-items-center border rounded">
+                                            <button class="btn btn-sm" type="button"
+                                                    onclick="updateQuantity({{ $item->product_id }}, {{ $item->quantity - 1 }})">
                                                 <i class="fas fa-minus"></i>
                                             </button>
-                                            <input type="number" value="{{ $item->quantity }}" min="1" max="100"
+                                            <input type="number" class="form-control text-center border-0"
+                                                   value="{{ $item->quantity }}" min="1" max="100"
+                                                   style="width: 60px;"
                                                    onchange="updateQuantity({{ $item->product_id }}, this.value)">
-                                            <button type="button" onclick="updateQuantity({{ $item->product_id }}, {{ $item->quantity + 1 }})">
+                                            <button class="btn btn-sm" type="button"
+                                                    onclick="updateQuantity({{ $item->product_id }}, {{ $item->quantity + 1 }})">
                                                 <i class="fas fa-plus"></i>
                                             </button>
                                         </div>
@@ -159,21 +99,21 @@
                                         </button>
                                     </div>
                                 </div>
-                            </div>
-                        @endforeach
+                            @endforeach
 
-                        <div class="text-end mt-3 pt-3 border-top">
-                            <h6>
-                                Sous-total {{ $cooperative->name }}:
-                                <span class="text-success">{{ number_format($items->sum('subtotal'), 2) }} MAD</span>
-                            </h6>
+                            <div class="text-end mt-3 pt-3 border-top">
+                                <h6>
+                                    Sous-total {{ $cooperative->name }}:
+                                    <span class="text-success">{{ number_format($items->sum('subtotal'), 2) }} MAD</span>
+                                </h6>
+                            </div>
                         </div>
                     </div>
                 @endforeach
             </div>
 
             <div class="col-lg-4">
-                <div class="card">
+                <div class="card shadow">
                     <div class="card-header">
                         <h5 class="mb-0">
                             <i class="fas fa-calculator me-2"></i>
@@ -205,7 +145,7 @@
                         </div>
 
                         <div class="d-grid gap-2">
-                            <a href="{{ route('client.checkout.show') }}" class="btn btn-success">
+                            <a href="{{ route('client.checkout.show') }}" class="btn btn-success btn-lg">
                                 <i class="fas fa-credit-card me-1"></i>
                                 Procéder au paiement
                             </a>
@@ -218,7 +158,7 @@
                 </div>
 
                 <!-- Info Card -->
-                <div class="card mt-3">
+                <div class="card mt-3 shadow">
                     <div class="card-body">
                         <h6 class="card-title">
                             <i class="fas fa-info-circle me-2 text-info"></i>
@@ -251,21 +191,25 @@
             <i class="fas fa-shopping-cart fa-4x text-muted mb-3"></i>
             <h4>Votre panier est vide</h4>
             <p class="text-muted mb-4">Découvrez nos produits et ajoutez-les à votre panier.</p>
-            <a href="{{ route('client.products.index') }}" class="btn btn-primary">
-                <i class="fas fa-search me-1"></i>
-                Parcourir les produits
-            </a>
+            <div class="d-flex gap-2 justify-content-center">
+                <a href="{{ route('client.products.index') }}" class="btn btn-primary">
+                    <i class="fas fa-search me-1"></i>
+                    Parcourir les produits
+                </a>
+                <a href="{{ route('client.dashboard') }}" class="btn btn-outline-primary">
+                    <i class="fas fa-home me-1"></i>
+                    Retour à l'accueil
+                </a>
+            </div>
         </div>
     @endif
 </div>
-@endsection
 
-@push('scripts')
 <script>
 function updateQuantity(productId, quantity) {
     if (quantity < 0) return;
 
-    fetch(`{{ route('client.cart.update') }}`, {
+    fetch('/client/cart/update', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -298,7 +242,7 @@ function removeItem(productId) {
         return;
     }
 
-    fetch(`{{ route('client.cart.remove') }}`, {
+    fetch('/client/cart/remove', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -327,7 +271,7 @@ function clearCart() {
         return;
     }
 
-    fetch(`{{ route('client.cart.clear') }}`, {
+    fetch('/client/cart/clear', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -366,4 +310,4 @@ function showAlert(message, type) {
     }, 5000);
 }
 </script>
-@endpush
+@endsection
