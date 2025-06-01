@@ -1,4 +1,7 @@
 <?php
+// =====================================================================================
+// FILE: app/Http/Controllers/Client/ReceiptController.php
+// =====================================================================================
 
 namespace App\Http\Controllers\Client;
 
@@ -7,8 +10,8 @@ use App\Models\ClientReceipt;
 use App\Models\AuthorizationReceipt;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use PDF; // Assuming you'll use a PDF library
 
 class ReceiptController extends Controller
 {
@@ -26,7 +29,6 @@ class ReceiptController extends Controller
 
         $receipt->load(['order.orderItems.product', 'cooperative', 'user']);
 
-        // For now, return a view. In production, you'd generate a PDF
         return view('client.receipts.client-receipt', compact('receipt'));
     }
 
@@ -42,56 +44,102 @@ class ReceiptController extends Controller
             'clientReceipt.user'
         ]);
 
-        // For now, return a view. In production, you'd generate a PDF
         return view('client.receipts.authorization-receipt', compact('authReceipt'));
     }
 
     public function createAuthorizationReceipt(Request $request, ClientReceipt $receipt)
     {
-        if ($receipt->user_id !== Auth::id()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Accès non autorisé'
-            ], 403);
-        }
-
-        $request->validate([
-            'authorized_person_name' => 'required|string|max:100',
-            'authorized_person_cin' => 'required|string|max:20',
-            'validity_days' => 'required|integer|min:1|max:30'
-        ]);
-
-        // Check if authorization receipt already exists for this client receipt
-        if ($receipt->authorizationReceipts()->where('is_revoked', false)->exists()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Un reçu d\'autorisation existe déjà pour cette commande'
-            ], 400);
-        }
-
         try {
+            // Check ownership
+            if ($receipt->user_id !== Auth::id()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Accès non autorisé'
+                ], 403);
+            }
+
+            // Log the request for debugging
+            Log::info('Authorization receipt creation request', [
+                'user_id' => Auth::id(),
+                'receipt_id' => $receipt->id,
+                'request_data' => $request->all()
+            ]);
+
+            // Validate the request
+            $validated = $request->validate([
+                'authorized_person_name' => 'required|string|max:100',
+                'authorized_person_cin' => 'required|string|max:20',
+                'validity_days' => 'required|integer|min:1|max:30'
+            ]);
+
+            // Check if authorization receipt already exists for this client receipt
+            $existingAuth = $receipt->authorizationReceipts()
+                ->where('is_revoked', false)
+                ->where('is_used', false)
+                ->where('validity_end', '>', now())
+                ->first();
+
+            if ($existingAuth) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Un reçu d\'autorisation valide existe déjà pour cette commande'
+                ], 400);
+            }
+
+            // Create authorization receipt
             $authReceipt = AuthorizationReceipt::create([
                 'auth_number' => $this->generateAuthNumber(),
                 'client_receipt_id' => $receipt->id,
-                'authorized_person_name' => $request->authorized_person_name,
+                'authorized_person_name' => $validated['authorized_person_name'],
                 'validity_start' => now(),
-                'validity_end' => now()->addDays($request->validity_days),
+                'validity_end' => now()->addDays($validated['validity_days']),
                 'unique_code' => $this->generateUniqueCode(),
-                'qr_code_data' => $this->generateAuthQRCodeData($receipt, $request->authorized_person_name, $request->authorized_person_cin),
+                'qr_code_data' => $this->generateAuthQRCodeData(
+                    $receipt,
+                    $validated['authorized_person_name'],
+                    $validated['authorized_person_cin']
+                ),
                 'is_revoked' => false,
                 'is_used' => false
+            ]);
+
+            Log::info('Authorization receipt created successfully', [
+                'auth_receipt_id' => $authReceipt->id,
+                'auth_number' => $authReceipt->auth_number,
+                'user_id' => Auth::id()
             ]);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Reçu d\'autorisation créé avec succès',
+                'auth_receipt_id' => $authReceipt->id,
                 'download_url' => route('client.receipts.authorization', $authReceipt)
             ]);
 
-        } catch (\Exception $e) {
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::warning('Authorization receipt validation failed', [
+                'user_id' => Auth::id(),
+                'receipt_id' => $receipt->id,
+                'errors' => $e->errors()
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Erreur lors de la création du reçu d\'autorisation'
+                'message' => 'Données invalides',
+                'errors' => $e->errors()
+            ], 422);
+
+        } catch (\Exception $e) {
+            Log::error('Authorization receipt creation failed', [
+                'user_id' => Auth::id(),
+                'receipt_id' => $receipt->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erreur lors de la création du reçu d\'autorisation: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -107,7 +155,11 @@ class ReceiptController extends Controller
 
     private function generateUniqueCode()
     {
-        return strtoupper(Str::random(12));
+        do {
+            $code = strtoupper(Str::random(12));
+        } while (AuthorizationReceipt::where('unique_code', $code)->exists());
+
+        return $code;
     }
 
     private function generateAuthQRCodeData($clientReceipt, $authorizedPersonName, $authorizedPersonCin)
@@ -123,3 +175,5 @@ class ReceiptController extends Controller
         ]);
     }
 }
+
+?>

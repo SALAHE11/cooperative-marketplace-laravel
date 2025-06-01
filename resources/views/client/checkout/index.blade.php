@@ -1,3 +1,6 @@
+<!-- ============================================================================= -->
+<!-- FILE: resources/views/client/checkout/index.blade.php - DEFINITIVE WORKING VERSION -->
+<!-- ============================================================================= -->
 @extends('layouts.app')
 
 @section('title', 'Finaliser ma Commande - Coopérative E-commerce')
@@ -80,7 +83,8 @@
         </div>
     </div>
 
-    <form id="checkoutForm">
+    <!-- IMPORTANT: This form MUST have this exact ID -->
+    <form id="checkoutForm" onsubmit="return false;">
         @csrf
         <div class="row">
             <!-- Order Summary -->
@@ -173,7 +177,7 @@
                         </h5>
                     </div>
                     <div class="p-4">
-                        <div class="payment-method" onclick="selectPaymentMethod('cash')">
+                        <div class="payment-method selected" onclick="selectPaymentMethod('cash')">
                             <div class="d-flex align-items-center">
                                 <input type="radio" class="form-check-input me-3" name="payment_method" value="cash" id="cash" checked>
                                 <div>
@@ -286,9 +290,9 @@
                             <strong class="h5 text-success">{{ number_format($cart->total_amount, 2) }} MAD</strong>
                         </div>
 
-                        <!-- Payment Button -->
+                        <!-- Payment Button - IMPORTANT: This button calls the function directly -->
                         <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-success btn-lg" id="payButton">
+                            <button type="button" class="btn btn-success btn-lg" id="payButton" onclick="processPayment()">
                                 <i class="fas fa-lock me-2"></i>
                                 Confirmer et Payer
                             </button>
@@ -326,124 +330,215 @@
     </form>
 </div>
 
+<!-- CRITICAL: This script MUST be loaded and working -->
 <script>
+// 1. FIRST: Test basic functionality
+console.log('=== CHECKOUT DEBUG START ===');
+console.log('Page loaded at:', new Date().toISOString());
+
+// 2. Test CSRF token
+function getCsrfToken() {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    const token = meta ? meta.getAttribute('content') : '';
+    console.log('CSRF Token:', token ? 'FOUND' : 'MISSING');
+    return token;
+}
+
+// 3. Test form existence
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize payment method
-    selectPaymentMethod('cash');
+    console.log('DOM Content Loaded');
 
-    // Form submission
-    document.getElementById('checkoutForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        processPayment();
-    });
-});
-
-function selectPaymentMethod(method) {
-    // Update radio button
-    document.getElementById(method).checked = true;
-
-    // Update visual selection
-    document.querySelectorAll('.payment-method').forEach(el => {
-        el.classList.remove('selected');
-    });
-    event.currentTarget.classList.add('selected');
-}
-
-function toggleAuthorizationForm() {
-    const checkbox = document.getElementById('create_authorization_receipt');
-    const form = document.getElementById('authorization-form');
-    const requiredFields = ['authorized_person_name', 'authorized_person_cin', 'authorization_validity_days'];
-
-    if (checkbox.checked) {
-        form.style.display = 'block';
-        requiredFields.forEach(field => {
-            document.getElementById(field).setAttribute('required', 'required');
-        });
-    } else {
-        form.style.display = 'none';
-        requiredFields.forEach(field => {
-            document.getElementById(field).removeAttribute('required');
-        });
-    }
-}
-
-function processPayment() {
-    const button = document.getElementById('payButton');
-    const originalText = button.innerHTML;
-
-    // Validate form
     const form = document.getElementById('checkoutForm');
-    if (!form.checkValidity()) {
-        form.reportValidity();
+    const button = document.getElementById('payButton');
+
+    console.log('Form found:', !!form);
+    console.log('Button found:', !!button);
+
+    if (!form) {
+        console.error('CRITICAL: Checkout form not found!');
+        alert('ERREUR: Formulaire non trouvé!');
         return;
     }
 
-    // Show loading
-    button.disabled = true;
-    button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Traitement du paiement...';
-
-    // Collect form data
-    const formData = new FormData(form);
-    const data = {};
-    for (let [key, value] of formData.entries()) {
-        data[key] = value;
+    if (!button) {
+        console.error('CRITICAL: Pay button not found!');
+        alert('ERREUR: Bouton de paiement non trouvé!');
+        return;
     }
 
-    // Convert checkbox to boolean
-    data.create_authorization_receipt = document.getElementById('create_authorization_receipt').checked;
+    console.log('=== CHECKOUT READY ===');
+});
 
-    fetch('{{ route("client.checkout.process") }}', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-        },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Success animation
-            button.innerHTML = '<i class="fas fa-check me-2"></i>Paiement réussi!';
-            button.classList.remove('btn-success');
-            button.classList.add('btn-outline-success');
+// 4. MAIN PAYMENT FUNCTION - This is called when button is clicked
+function processPayment() {
+    console.log('=== PROCESSING PAYMENT ===');
 
-            showAlert(data.message, 'success');
+    try {
+        const button = document.getElementById('payButton');
+        const form = document.getElementById('checkoutForm');
 
-            // Redirect after delay
-            setTimeout(() => {
-                window.location.href = data.redirect;
-            }, 1500);
-        } else {
-            showAlert(data.message, 'danger');
+        if (!button || !form) {
+            throw new Error('Button or form not found');
+        }
+
+        // Get CSRF token
+        const csrfToken = getCsrfToken();
+        if (!csrfToken) {
+            throw new Error('CSRF token not found');
+        }
+
+        // Show loading
+        const originalText = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Traitement...';
+
+        console.log('Collecting form data...');
+
+        // Collect form data manually to ensure it works
+        const formData = new FormData(form);
+        const data = {};
+
+        // Get all form fields
+        for (let [key, value] of formData.entries()) {
+            data[key] = value;
+        }
+
+        // Add checkbox value manually
+        const authCheckbox = document.getElementById('create_authorization_receipt');
+        data.create_authorization_receipt = authCheckbox ? authCheckbox.checked : false;
+
+        console.log('Form data collected:', data);
+
+        // Make AJAX request
+        console.log('Sending request to:', '{{ route("client.checkout.process") }}');
+
+        fetch('{{ route("client.checkout.process") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => {
+            console.log('Response status:', response.status);
+            console.log('Response headers:', response.headers);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            return response.json();
+        })
+        .then(result => {
+            console.log('Response data:', result);
+
+            if (result.success) {
+                // Success!
+                button.innerHTML = '<i class="fas fa-check me-2"></i>Succès!';
+                button.classList.remove('btn-success');
+                button.classList.add('btn-outline-success');
+
+                alert('Paiement réussi! Redirection...');
+
+                // Redirect
+                setTimeout(() => {
+                    window.location.href = result.redirect;
+                }, 1500);
+            } else {
+                throw new Error(result.message || 'Erreur inconnue');
+            }
+        })
+        .catch(error => {
+            console.error('Payment error:', error);
+            alert('Erreur: ' + error.message);
+
+            // Reset button
             button.innerHTML = originalText;
             button.disabled = false;
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showAlert('Erreur lors du traitement du paiement', 'danger');
-        button.innerHTML = originalText;
-        button.disabled = false;
-    });
+        });
+
+    } catch (error) {
+        console.error('Critical error in processPayment:', error);
+        alert('Erreur critique: ' + error.message);
+    }
 }
 
-function showAlert(message, type) {
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
-    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
-    alertDiv.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
+// 5. Payment method selection
+function selectPaymentMethod(method) {
+    console.log('Payment method selected:', method);
 
-    document.body.appendChild(alertDiv);
+    try {
+        // Clear all selections
+        document.querySelectorAll('.payment-method').forEach(el => {
+            el.classList.remove('selected');
+        });
 
-    setTimeout(() => {
-        if (alertDiv.parentNode) {
-            alertDiv.parentNode.removeChild(alertDiv);
+        // Select the clicked method
+        event.currentTarget.classList.add('selected');
+
+        // Update radio button
+        const radio = document.getElementById(method);
+        if (radio) {
+            radio.checked = true;
         }
-    }, 5000);
+
+        console.log('Payment method set to:', method);
+    } catch (error) {
+        console.error('Error selecting payment method:', error);
+    }
 }
+
+// 6. Authorization form toggle
+function toggleAuthorizationForm() {
+    console.log('Toggling authorization form');
+
+    try {
+        const checkbox = document.getElementById('create_authorization_receipt');
+        const form = document.getElementById('authorization-form');
+
+        if (!checkbox || !form) {
+            console.error('Authorization elements not found');
+            return;
+        }
+
+        if (checkbox.checked) {
+            form.style.display = 'block';
+            console.log('Authorization form shown');
+        } else {
+            form.style.display = 'none';
+            console.log('Authorization form hidden');
+        }
+    } catch (error) {
+        console.error('Error toggling authorization form:', error);
+    }
+}
+
+// 7. Test everything when page loads
+window.addEventListener('load', function() {
+    console.log('=== FINAL CHECKOUT TEST ===');
+    console.log('Window loaded, testing all functions...');
+
+    // Test CSRF
+    const token = getCsrfToken();
+    console.log('CSRF test:', token ? 'PASS' : 'FAIL');
+
+    // Test form
+    const form = document.getElementById('checkoutForm');
+    console.log('Form test:', form ? 'PASS' : 'FAIL');
+
+    // Test button
+    const button = document.getElementById('payButton');
+    console.log('Button test:', button ? 'PASS' : 'FAIL');
+
+    if (!token || !form || !button) {
+        console.error('CHECKOUT SETUP FAILED!');
+        alert('ERREUR: La page de checkout n\'est pas correctement configurée!');
+    } else {
+        console.log('=== CHECKOUT READY FOR USE ===');
+    }
+});
 </script>
 @endsection

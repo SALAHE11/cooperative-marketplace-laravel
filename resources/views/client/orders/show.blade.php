@@ -140,19 +140,10 @@
                     </h4>
                     @if($order->status === 'pending')
                         <p class="mb-0">Votre commande est en cours de préparation par la coopérative.</p>
-                        @if($order->estimated_ready_at)
-                            <p class="mb-0"><strong>Estimation:</strong> {{ $order->estimated_ready_at->format('d/m/Y à H:i') }}</p>
-                        @endif
                     @elseif($order->status === 'ready')
                         <p class="mb-0">Votre commande est prête! Vous pouvez la récupérer à la coopérative.</p>
-                        @if($order->ready_at)
-                            <p class="mb-0"><strong>Prête depuis:</strong> {{ $order->ready_at->diffForHumans() }}</p>
-                        @endif
                     @elseif($order->status === 'completed')
                         <p class="mb-0">Votre commande a été récupérée avec succès.</p>
-                        @if($order->picked_up_at)
-                            <p class="mb-0"><strong>Récupérée le:</strong> {{ $order->picked_up_at->format('d/m/Y à H:i') }}</p>
-                        @endif
                     @endif
                 </div>
             </div>
@@ -191,13 +182,6 @@
                             <div class="col-md-6">
                                 <h6 class="text-muted mb-2">Secteur d'activité</h6>
                                 <p class="mb-0">{{ $cooperative->sector_of_activity }}</p>
-
-                                @if($order->pickup_instructions)
-                                    <h6 class="text-muted mb-2 mt-3">Instructions spéciales</h6>
-                                    <div class="alert alert-info py-2">
-                                        {{ $order->pickup_instructions }}
-                                    </div>
-                                @endif
                             </div>
                         </div>
                     </div>
@@ -307,29 +291,18 @@
                         @if($order->status !== 'cancelled')
                             <div class="timeline-item {{ in_array($order->status, ['ready', 'completed']) ? 'completed' : 'current' }}">
                                 <div class="fw-bold">En préparation</div>
-                                @if($order->estimated_ready_at)
-                                    <div class="text-muted">Estimation: {{ $order->estimated_ready_at->format('d/m/Y à H:i') }}</div>
-                                @endif
                                 <small class="text-muted">Coopérative prépare votre commande</small>
                             </div>
 
                             <div class="timeline-item {{ $order->status === 'completed' ? 'completed' : ($order->status === 'ready' ? 'current' : '') }}">
                                 <div class="fw-bold">Prêt pour retrait</div>
-                                @if($order->ready_at)
-                                    <div class="text-muted">{{ $order->ready_at->format('d/m/Y à H:i') }}</div>
-                                @endif
                                 <small class="text-muted">Notification envoyée</small>
                             </div>
 
                             <div class="timeline-item {{ $order->status === 'completed' ? 'completed' : '' }}">
                                 <div class="fw-bold">Retiré</div>
-                                @if($order->picked_up_at)
-                                    <div class="text-muted">{{ $order->picked_up_at->format('d/m/Y à H:i') }}</div>
-                                    @if($order->picked_up_by === 'authorized_person')
-                                        <small class="text-info">Retiré par une personne autorisée</small>
-                                    @else
-                                        <small class="text-muted">Retiré en personne</small>
-                                    @endif
+                                @if($order->status === 'completed')
+                                    <small class="text-muted">Commande terminée</small>
                                 @else
                                     <small class="text-muted">En attente de retrait</small>
                                 @endif
@@ -393,7 +366,7 @@
                         <div class="card-body">
                             <div class="text-center mb-3">
                                 <div class="fw-bold">{{ $order->clientReceipt->receipt_number }}</div>
-                                <small class="text-muted">{{ $order->clientReceipt->issued_at->format('d/m/Y H:i') }}</small>
+                                <small class="text-muted">{{ $order->clientReceipt->created_at->format('d/m/Y H:i') }}</small>
                             </div>
 
                             <div class="alert alert-info text-center py-2">
@@ -522,25 +495,28 @@
                         <label for="authorized_person_name" class="form-label">Nom de la personne autorisée *</label>
                         <input type="text" class="form-control" id="authorized_person_name"
                                name="authorized_person_name" required>
+                        <div class="invalid-feedback"></div>
                     </div>
                     <div class="mb-3">
                         <label for="authorized_person_cin" class="form-label">CIN ou Passeport *</label>
                         <input type="text" class="form-control" id="authorized_person_cin"
                                name="authorized_person_cin" required>
+                        <div class="invalid-feedback"></div>
                     </div>
                     <div class="mb-3">
-                        <label for="authorization_validity_days" class="form-label">Validité *</label>
-                        <select class="form-select" id="authorization_validity_days" name="authorization_validity_days" required>
+                        <label for="validity_days" class="form-label">Validité *</label>
+                        <select class="form-select" id="validity_days" name="validity_days" required>
                             <option value="7">7 jours</option>
                             <option value="15" selected>15 jours</option>
                             <option value="30">30 jours</option>
                         </select>
+                        <div class="invalid-feedback"></div>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-                <button type="button" class="btn btn-warning" onclick="createAuthorizationReceipt()">
+                <button type="button" class="btn btn-warning" id="createAuthBtn" onclick="createAuthorizationReceipt()">
                     <i class="fas fa-check me-1"></i>
                     Créer l'Autorisation
                 </button>
@@ -553,50 +529,76 @@
 function showAuthorizationModal() {
     const modal = new bootstrap.Modal(document.getElementById('authorizationModal'));
     document.getElementById('authorizationForm').reset();
+    clearValidationErrors();
     modal.show();
 }
 
-function createAuthorizationReceipt() {
+async function createAuthorizationReceipt() {
     const form = document.getElementById('authorizationForm');
-    if (!form.checkValidity()) {
-        form.reportValidity();
-        return;
-    }
+    const button = document.getElementById('createAuthBtn');
+    const originalText = button.innerHTML;
 
-    const formData = new FormData(form);
-    const data = {};
-    for (let [key, value] of formData.entries()) {
-        data[key] = value;
-    }
+    try {
+        // Clear previous validation errors
+        clearValidationErrors();
 
-    fetch('{{ route("client.receipts.create-authorization", $order->clientReceipt) }}', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-        },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showAlert(data.message, 'success');
+        // Validate form
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        // Show loading
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Création...';
+
+        // Collect form data
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+
+        console.log('Creating authorization receipt:', data);
+
+        // Make request
+        const response = await fetch('{{ route("client.receipts.create-authorization", $order->clientReceipt) }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': getCsrfToken(),
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+        console.log('Authorization response:', result);
+
+        if (response.ok && result.success) {
+            showAlert(result.message, 'success');
             bootstrap.Modal.getInstance(document.getElementById('authorizationModal')).hide();
 
             // Open the authorization receipt in new tab
-            if (data.download_url) {
-                window.open(data.download_url, '_blank');
+            if (result.download_url) {
+                window.open(result.download_url, '_blank');
             }
 
+            // Reload page after delay to show the new authorization receipt
             setTimeout(() => location.reload(), 1500);
         } else {
-            showAlert(data.message, 'danger');
+            // Handle errors
+            if (result.errors) {
+                displayValidationErrors(result.errors);
+                showAlert('Veuillez corriger les erreurs dans le formulaire', 'danger');
+            } else {
+                showAlert(result.message || 'Erreur lors de la création de l\'autorisation', 'danger');
+            }
         }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showAlert('Erreur lors de la création de l\'autorisation', 'danger');
-    });
+    } catch (error) {
+        console.error('Authorization creation error:', error);
+        showAlert('Erreur de connexion. Veuillez réessayer.', 'danger');
+    } finally {
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
 }
 
 function shareOrder() {
@@ -618,24 +620,6 @@ function shareOrder() {
 
 function showSupportInfo() {
     alert('Support: support@cooperative-ecommerce.ma\nTéléphone: +212 5XX-XXXXXX\nHeures: 9h-18h (Lun-Ven)');
-}
-
-function showAlert(message, type) {
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
-    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
-    alertDiv.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
-
-    document.body.appendChild(alertDiv);
-
-    setTimeout(() => {
-        if (alertDiv.parentNode) {
-            alertDiv.parentNode.removeChild(alertDiv);
-        }
-    }, 5000);
 }
 
 // Auto-refresh for pending/ready orders

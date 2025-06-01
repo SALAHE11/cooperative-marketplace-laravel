@@ -1,4 +1,7 @@
 <?php
+// =====================================================================================
+// FILE: app/Http/Controllers/Client/CheckoutController.php
+// =====================================================================================
 
 namespace App\Http\Controllers\Client;
 
@@ -11,7 +14,9 @@ use App\Models\AuthorizationReceipt;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class CheckoutController extends Controller
 {
@@ -52,35 +57,57 @@ class CheckoutController extends Controller
 
     public function process(Request $request)
     {
-        $request->validate([
-            'client_phone' => 'required|string|max:20',
-            'pickup_instructions' => 'nullable|string|max:500',
-            'payment_method' => 'required|in:cash,card,bank_transfer',
-            'card_number' => 'required_if:payment_method,card|nullable|string|size:16',
-            'card_expiry' => 'required_if:payment_method,card|nullable|string|size:5',
-            'card_cvv' => 'required_if:payment_method,card|nullable|string|size:3',
-            'cardholder_name' => 'required_if:payment_method,card|nullable|string|max:100',
-            'bank_reference' => 'required_if:payment_method,bank_transfer|nullable|string|max:50',
-            'create_authorization_receipt' => 'nullable|boolean',
-            'authorized_person_name' => 'required_if:create_authorization_receipt,1|nullable|string|max:100',
-            'authorized_person_cin' => 'required_if:create_authorization_receipt,1|nullable|string|max:20',
-            'authorization_validity_days' => 'required_if:create_authorization_receipt,1|nullable|integer|min:1|max:30'
-        ]);
-
-        $cart = Cart::where('user_id', Auth::id())->first();
-
-        if (!$cart || $cart->isEmpty()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Votre panier est vide'
-            ], 400);
-        }
-
         try {
+            // Log the incoming request for debugging
+            Log::info('Checkout process started', [
+                'user_id' => Auth::id(),
+                'request_data' => $request->all()
+            ]);
+
+            // Validate the request
+            $validated = $request->validate([
+                'client_phone' => 'required|string|max:20',
+                'pickup_instructions' => 'nullable|string|max:500',
+                'payment_method' => 'required|in:cash,card,bank_transfer',
+                'card_number' => 'required_if:payment_method,card|nullable|string|size:16',
+                'card_expiry' => 'required_if:payment_method,card|nullable|string|size:5',
+                'card_cvv' => 'required_if:payment_method,card|nullable|string|size:3',
+                'cardholder_name' => 'required_if:payment_method,card|nullable|string|max:100',
+                'bank_reference' => 'required_if:payment_method,bank_transfer|nullable|string|max:50',
+                'create_authorization_receipt' => 'nullable|boolean',
+                'authorized_person_name' => 'required_if:create_authorization_receipt,true|nullable|string|max:100',
+                'authorized_person_cin' => 'required_if:create_authorization_receipt,true|nullable|string|max:20',
+                'authorization_validity_days' => 'required_if:create_authorization_receipt,true|nullable|integer|min:1|max:30'
+            ]);
+
+            // Get the cart
+            $cart = Cart::where('user_id', Auth::id())->first();
+
+            if (!$cart || $cart->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Votre panier est vide'
+                ], 400);
+            }
+
+            // Get cart items by cooperative
+            $itemsByCooperative = $cart->getItemsByCooperative();
+
+            // Check availability again
+            foreach ($itemsByCooperative as $items) {
+                foreach ($items as $item) {
+                    if (!$item->isAvailable()) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => "Le produit '{$item->getProductName()}' n'est plus disponible"
+                        ], 400);
+                    }
+                }
+            }
+
             DB::beginTransaction();
 
             $user = Auth::user();
-            $itemsByCooperative = $cart->getItemsByCooperative();
             $orders = collect();
             $clientReceipts = collect();
 
@@ -90,22 +117,35 @@ class CheckoutController extends Controller
                 $orderTotal = $items->sum('subtotal');
 
                 // Simulate payment processing
-                $paymentReference = $this->simulatePayment($request->payment_method, $orderTotal);
+                $paymentReference = $this->simulatePayment($validated['payment_method'], $orderTotal);
 
-                // Create order using only existing fields
+                Log::info('Creating order', [
+                    'cooperative_id' => $cooperativeId,
+                    'total' => $orderTotal,
+                    'payment_reference' => $paymentReference
+                ]);
+
+                // Create order
                 $order = Order::create([
                     'user_id' => $user->id,
                     'order_number' => $this->generateOrderNumber(),
                     'status' => 'pending',
                     'total_amount' => $orderTotal,
-                    'shipping_address' => $user->address ?? '',
-                    'payment_method' => $request->payment_method,
+                    'shipping_address' => $user->address ?? 'Retrait en coopérative',
+                    'payment_method' => $validated['payment_method'],
                     'payment_status' => 'paid',
-                    'notes' => $request->pickup_instructions ?: 'Commande passée via la plateforme'
+                    'notes' => trim(($validated['pickup_instructions'] ?? '') . "\n" . "Ref: {$paymentReference}")
                 ]);
+
+                Log::info('Order created', ['order_id' => $order->id, 'order_number' => $order->order_number]);
 
                 // Create order items
                 foreach ($items as $item) {
+                    // Double-check stock before creating order item
+                    if ($item->product->stock_quantity < $item->quantity) {
+                        throw new \Exception("Stock insuffisant pour {$item->product->name}");
+                    }
+
                     OrderItem::create([
                         'order_id' => $order->id,
                         'product_id' => $item->product_id,
@@ -117,9 +157,15 @@ class CheckoutController extends Controller
 
                     // Update product stock
                     $item->product->decrement('stock_quantity', $item->quantity);
+
+                    Log::info('Stock updated', [
+                        'product_id' => $item->product_id,
+                        'quantity_removed' => $item->quantity,
+                        'new_stock' => $item->product->fresh()->stock_quantity
+                    ]);
                 }
 
-                // Create client receipt using only existing fields
+                // Create client receipt
                 $clientReceipt = ClientReceipt::create([
                     'receipt_number' => $this->generateReceiptNumber(),
                     'order_id' => $order->id,
@@ -131,39 +177,79 @@ class CheckoutController extends Controller
                     'is_void' => false
                 ]);
 
+                Log::info('Client receipt created', [
+                    'receipt_id' => $clientReceipt->id,
+                    'receipt_number' => $clientReceipt->receipt_number
+                ]);
+
                 $orders->push($order);
                 $clientReceipts->push($clientReceipt);
 
                 // Create authorization receipt if requested
-                if ($request->create_authorization_receipt) {
-                    AuthorizationReceipt::create([
+                if ($validated['create_authorization_receipt'] ?? false) {
+                    $authReceipt = AuthorizationReceipt::create([
                         'auth_number' => $this->generateAuthNumber(),
                         'client_receipt_id' => $clientReceipt->id,
-                        'authorized_person_name' => $request->authorized_person_name,
+                        'authorized_person_name' => $validated['authorized_person_name'],
                         'validity_start' => now(),
-                        'validity_end' => now()->addDays($request->authorization_validity_days),
+                        'validity_end' => now()->addDays($validated['authorization_validity_days']),
                         'unique_code' => $this->generateUniqueCode(),
-                        'qr_code_data' => $this->generateAuthQRCodeData($clientReceipt, $request->authorized_person_name, $request->authorized_person_cin),
+                        'qr_code_data' => $this->generateAuthQRCodeData(
+                            $clientReceipt,
+                            $validated['authorized_person_name'],
+                            $validated['authorized_person_cin']
+                        ),
                         'is_revoked' => false,
                         'is_used' => false
+                    ]);
+
+                    Log::info('Authorization receipt created', [
+                        'auth_receipt_id' => $authReceipt->id,
+                        'auth_number' => $authReceipt->auth_number
                     ]);
                 }
             }
 
             // Clear cart
             $cart->clear();
+            Log::info('Cart cleared for user', ['user_id' => $user->id]);
 
             DB::commit();
+
+            Log::info('Checkout completed successfully', [
+                'user_id' => $user->id,
+                'orders_created' => $orders->count(),
+                'total_amount' => $orders->sum('total_amount')
+            ]);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Commande(s) passée(s) avec succès!',
-                'orders' => $orders->pluck('id'),
+                'orders' => $orders->pluck('id')->toArray(),
                 'redirect' => route('client.checkout.success', ['orders' => $orders->pluck('id')->implode(',')])
             ]);
 
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::warning('Checkout validation failed', [
+                'user_id' => Auth::id(),
+                'errors' => $e->errors()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Données invalides',
+                'errors' => $e->errors()
+            ], 422);
+
         } catch (\Exception $e) {
             DB::rollBack();
+
+            Log::error('Checkout process failed', [
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Erreur lors du traitement de la commande: ' . $e->getMessage()
@@ -189,13 +275,16 @@ class CheckoutController extends Controller
 
     private function simulatePayment($method, $amount)
     {
+        // Simulate payment processing delay
+        usleep(500000); // 0.5 second delay
+
         switch ($method) {
             case 'card':
-                return 'CARD_' . strtoupper(Str::random(10));
+                return 'CARD_' . strtoupper(Str::random(8)) . '_' . time();
             case 'bank_transfer':
-                return 'BANK_' . strtoupper(Str::random(10));
+                return 'BANK_' . strtoupper(Str::random(8)) . '_' . time();
             default:
-                return 'CASH_' . strtoupper(Str::random(10));
+                return 'CASH_' . strtoupper(Str::random(8)) . '_' . time();
         }
     }
 
@@ -262,3 +351,5 @@ class CheckoutController extends Controller
         ]);
     }
 }
+
+?>
