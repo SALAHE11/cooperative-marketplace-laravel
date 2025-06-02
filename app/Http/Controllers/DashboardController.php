@@ -129,33 +129,34 @@ class DashboardController extends Controller
         }
 
         $cooperative = $user->cooperative;
-        $stats = [];
+        $productStats = [];
+        $orderStats = [];
+        $revenueStats = [];
         $recentProducts = collect();
         $lowStockProducts = collect();
         $outOfStockProducts = collect();
         $recentOrders = collect();
-        $orderStats = [];
+        $urgentOrders = collect();
 
         if ($cooperative && $cooperative->status === 'approved') {
             // Product statistics
-            $stats = [
-                'products' => [
-                    'total' => $cooperative->products()->count(),
-                    'approved' => $cooperative->products()->where('status', 'approved')->count(),
-                    'pending' => $cooperative->products()->where('status', 'pending')->count(),
-                    'draft' => $cooperative->products()->where('status', 'draft')->count(),
-                    'rejected' => $cooperative->products()->where('status', 'rejected')->count(),
-                    'needs_info' => $cooperative->products()->where('status', 'needs_info')->count(),
-                    'active' => $cooperative->products()->where('status', 'approved')->where('is_active', true)->count(),
-                    'low_stock' => $cooperative->products()
-                        ->where('status', 'approved')
-                        ->whereRaw('stock_quantity <= stock_alert_threshold')
-                        ->count(),
-                    'out_of_stock' => $cooperative->products()
-                        ->where('status', 'approved')
-                        ->where('stock_quantity', 0)
-                        ->count(),
-                ]
+            $productStats = [
+                'total' => $cooperative->products()->count(),
+                'approved' => $cooperative->products()->where('status', 'approved')->count(),
+                'pending' => $cooperative->products()->where('status', 'pending')->count(),
+                'draft' => $cooperative->products()->where('status', 'draft')->count(),
+                'rejected' => $cooperative->products()->where('status', 'rejected')->count(),
+                'needs_info' => $cooperative->products()->where('status', 'needs_info')->count(),
+                'active' => $cooperative->products()->where('status', 'approved')->where('is_active', true)->count(),
+                'low_stock' => $cooperative->products()
+                    ->where('status', 'approved')
+                    ->whereRaw('stock_quantity <= stock_alert_threshold')
+                    ->where('stock_quantity', '>', 0)
+                    ->count(),
+                'out_of_stock' => $cooperative->products()
+                    ->where('status', 'approved')
+                    ->where('stock_quantity', 0)
+                    ->count(),
             ];
 
             // Order statistics
@@ -172,36 +173,52 @@ class DashboardController extends Controller
                 'completed' => Order::whereHas('orderItems', function($q) use ($cooperative) {
                     $q->where('cooperative_id', $cooperative->id);
                 })->where('status', 'completed')->count(),
+                'cancelled' => Order::whereHas('orderItems', function($q) use ($cooperative) {
+                    $q->where('cooperative_id', $cooperative->id);
+                })->where('status', 'cancelled')->count(),
                 'today' => Order::whereHas('orderItems', function($q) use ($cooperative) {
                     $q->where('cooperative_id', $cooperative->id);
                 })->whereDate('created_at', now()->toDateString())->count(),
                 'this_week' => Order::whereHas('orderItems', function($q) use ($cooperative) {
                     $q->where('cooperative_id', $cooperative->id);
                 })->where('created_at', '>=', now()->startOfWeek())->count(),
+                'this_month' => Order::whereHas('orderItems', function($q) use ($cooperative) {
+                    $q->where('cooperative_id', $cooperative->id);
+                })->whereMonth('created_at', now()->month)->whereYear('created_at', now()->year)->count(),
             ];
 
             // Revenue statistics
-            $stats['revenue'] = [
+            $revenueStats = [
                 'total' => Order::whereHas('orderItems', function($q) use ($cooperative) {
                     $q->where('cooperative_id', $cooperative->id);
                 })->where('payment_status', 'paid')->sum('total_amount'),
+                'today' => Order::whereHas('orderItems', function($q) use ($cooperative) {
+                    $q->where('cooperative_id', $cooperative->id);
+                })->where('payment_status', 'paid')
+                    ->whereDate('created_at', now()->toDateString())
+                    ->sum('total_amount'),
                 'this_month' => Order::whereHas('orderItems', function($q) use ($cooperative) {
                     $q->where('cooperative_id', $cooperative->id);
                 })->where('payment_status', 'paid')
                     ->whereMonth('created_at', now()->month)
+                    ->whereYear('created_at', now()->year)
                     ->sum('total_amount'),
                 'last_month' => Order::whereHas('orderItems', function($q) use ($cooperative) {
                     $q->where('cooperative_id', $cooperative->id);
                 })->where('payment_status', 'paid')
                     ->whereMonth('created_at', now()->subMonth()->month)
+                    ->whereYear('created_at', now()->subMonth()->year)
                     ->sum('total_amount'),
+                'avg_order_value' => Order::whereHas('orderItems', function($q) use ($cooperative) {
+                    $q->where('cooperative_id', $cooperative->id);
+                })->where('payment_status', 'paid')->avg('total_amount') ?: 0,
             ];
 
             // Get recent products
             $recentProducts = $cooperative->products()
                 ->with(['category', 'images'])
                 ->orderBy('updated_at', 'desc')
-                ->take(10)
+                ->take(5)
                 ->get();
 
             // Get low stock products
@@ -210,7 +227,7 @@ class DashboardController extends Controller
                 ->whereRaw('stock_quantity <= stock_alert_threshold')
                 ->where('stock_quantity', '>', 0)
                 ->orderBy('stock_quantity', 'asc')
-                ->take(10)
+                ->take(5)
                 ->get();
 
             // Get out of stock products
@@ -226,16 +243,34 @@ class DashboardController extends Controller
                     $q->where('cooperative_id', $cooperative->id);
                 })
                 ->with(['user', 'orderItems' => function($q) use ($cooperative) {
+                    $q->where('cooperative_id', $cooperative->id)->with('product.primaryImage');
+                }, 'clientReceipt.authorizationReceipts'])
+                ->orderBy('created_at', 'desc')
+                ->take(8)
+                ->get();
+
+            // Get urgent orders (pending and ready orders that need attention)
+            $urgentOrders = Order::whereHas('orderItems', function($q) use ($cooperative) {
+                    $q->where('cooperative_id', $cooperative->id);
+                })
+                ->whereIn('status', ['pending', 'ready'])
+                ->with(['user', 'orderItems' => function($q) use ($cooperative) {
                     $q->where('cooperative_id', $cooperative->id)->with('product');
                 }])
-                ->orderBy('created_at', 'desc')
-                ->take(10)
+                ->orderByRaw("CASE
+                    WHEN status = 'ready' THEN 1
+                    WHEN status = 'pending' AND created_at < NOW() - INTERVAL 2 HOUR THEN 2
+                    ELSE 3
+                END")
+                ->orderBy('created_at', 'asc')
+                ->take(5)
                 ->get();
         }
 
         return view('dashboards.coop', compact(
-            'cooperative', 'stats', 'orderStats', 'recentProducts',
-            'lowStockProducts', 'outOfStockProducts', 'recentOrders'
+            'cooperative', 'productStats', 'orderStats', 'revenueStats',
+            'recentProducts', 'lowStockProducts', 'outOfStockProducts',
+            'recentOrders', 'urgentOrders'
         ));
     }
 
