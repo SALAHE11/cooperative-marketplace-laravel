@@ -135,68 +135,70 @@ class OrderManagementController extends Controller
     }
 
     public function markPickedUp(Request $request, Order $order)
-    {
-        $user = Auth::user();
-        $cooperative = $user->cooperative;
+{
+    $user = Auth::user();
+    $cooperative = $user->cooperative;
 
-        // Check if this order belongs to this cooperative
-        if (!$order->orderItems()->where('cooperative_id', $cooperative->id)->exists()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Accès non autorisé à cette commande'
-            ], 403);
+    // Check if this order belongs to this cooperative
+    if (!$order->orderItems()->where('cooperative_id', $cooperative->id)->exists()) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Accès non autorisé à cette commande'
+        ], 403);
+    }
+
+    $request->validate([
+        'picked_up_by' => 'required|in:client,authorized_person',
+        'verification_code' => 'required|string',
+        'notes' => 'nullable|string|max:500'
+    ]);
+
+    try {
+        // Verify the receipt
+        $clientReceipt = $order->clientReceipt;
+        $isValid = false;
+
+        if ($request->picked_up_by === 'client') {
+            $isValid = $clientReceipt && $clientReceipt->verification_code === $request->verification_code;
+        } else {
+            // Check authorization receipt
+            $authReceipt = $clientReceipt->authorizationReceipts()
+                ->where('unique_code', $request->verification_code)
+                ->where('is_revoked', false)
+                ->where('is_used', false)
+                ->where('validity_end', '>', now())
+                ->first();
+
+            if ($authReceipt) {
+                $authReceipt->update(['is_used' => true, 'used_at' => now()]);
+                $isValid = true;
+            }
         }
 
-        $request->validate([
-            'picked_up_by' => 'required|in:client,authorized_person',
-            'verification_code' => 'required|string',
-            'notes' => 'nullable|string|max:500'
+        if (!$isValid) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Code de vérification invalide'
+            ], 400);
+        }
+
+        $order->update([
+            'status' => 'completed',
+            'picked_up_at' => now(),
+            'picked_up_by' => $request->picked_up_by,
+            'notes' => $request->notes
         ]);
 
-        try {
-            // Verify the receipt
-            $clientReceipt = $order->clientReceipt;
-            $isValid = false;
+        return response()->json([
+            'success' => true,
+            'message' => 'Commande marquée comme récupérée avec succès'
+        ]);
 
-            if ($request->picked_up_by === 'client') {
-                $isValid = $clientReceipt && $clientReceipt->verification_code === $request->verification_code;
-            } else {
-                // Check authorization receipt
-                $authReceipt = $clientReceipt->authorizationReceipts()
-                    ->where('unique_code', $request->verification_code)
-                    ->where('is_revoked', false)
-                    ->where('is_used', false)
-                    ->where('validity_end', '>', now())
-                    ->first();
-
-                if ($authReceipt) {
-                    $authReceipt->update(['is_used' => true, 'used_at' => now()]);
-                    $isValid = true;
-                }
-            }
-
-            if (!$isValid) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Code de vérification invalide'
-                ], 400);
-            }
-
-            $order->update([
-                'status' => 'completed',
-                'notes' => $request->notes
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Commande marquée comme récupérée avec succès'
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Erreur lors de la validation de la récupération'
-            ], 500);
-        }
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Erreur lors de la validation de la récupération'
+        ], 500);
     }
+}
 }

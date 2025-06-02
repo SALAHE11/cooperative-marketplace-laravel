@@ -343,7 +343,7 @@
                             <div class="alert alert-success text-center">
                                 <i class="fas fa-check-circle fa-2x mb-2"></i>
                                 <div><strong>Commande Terminée</strong></div>
-                                <small>Retiré {{ $order->picked_up_at->diffForHumans() }}</small>
+                                <small>Retiré {{ $order->picked_up_at ? $order->picked_up_at->diffForHumans() : 'récemment' }}</small>
                             </div>
                         @else
                             <div class="alert alert-warning text-center">
