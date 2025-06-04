@@ -187,12 +187,19 @@ class CheckoutController extends Controller
 
                 // Create authorization receipt if requested
                 if ($validated['create_authorization_receipt'] ?? false) {
+                    Log::info('Creating authorization receipt', [
+                        'client_receipt_id' => $clientReceipt->id,
+                        'authorized_person_name' => $validated['authorized_person_name'],
+                        'authorized_person_cin' => $validated['authorized_person_cin']
+                    ]);
+
                     $authReceipt = AuthorizationReceipt::create([
                         'auth_number' => $this->generateAuthNumber(),
                         'client_receipt_id' => $clientReceipt->id,
                         'authorized_person_name' => $validated['authorized_person_name'],
+                        'authorized_person_cin' => $validated['authorized_person_cin'], // FIXED: Now saving this field
                         'validity_start' => now(),
-                        'validity_end' => now()->addDays($validated['authorization_validity_days']),
+                        'validity_end' => now()->addDays((int) $validated['authorization_validity_days']),
                         'unique_code' => $this->generateUniqueCode(),
                         'qr_code_data' => $this->generateAuthQRCodeData(
                             $clientReceipt,
@@ -205,7 +212,8 @@ class CheckoutController extends Controller
 
                     Log::info('Authorization receipt created', [
                         'auth_receipt_id' => $authReceipt->id,
-                        'auth_number' => $authReceipt->auth_number
+                        'auth_number' => $authReceipt->auth_number,
+                        'authorized_person_cin' => $authReceipt->authorized_person_cin
                     ]);
                 }
             }
