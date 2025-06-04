@@ -78,9 +78,13 @@
         }
         .verification-code .code {
             color: #856404;
-            letter-spacing: 3px;
-            font-size: 2rem;
-            margin: 10px 0;
+            letter-spacing: 4px;
+            font-size: 2.2rem;
+            margin: 15px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border: 2px solid #ffc107;
         }
         .items-section {
             background: #e9ecef;
@@ -117,20 +121,6 @@
         .pickup-section h3 {
             color: #155724;
             margin-top: 0;
-        }
-        .qr-placeholder {
-            width: 120px;
-            height: 120px;
-            background: #f8f9fa;
-            border: 2px dashed #dee2e6;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 15px auto;
-            font-size: 0.9rem;
-            color: #666;
-            text-align: center;
         }
         .footer {
             background: #f8f9fa;
@@ -259,12 +249,6 @@
                 <h3>🔐 Code de Vérification</h3>
                 <div class="code">{{ $receipt->verification_code }}</div>
                 <p><strong>Présentez ce code lors du retrait</strong></p>
-
-                <!-- QR Code Placeholder -->
-                <div class="qr-placeholder">
-                    QR CODE<br>
-                    <small>{{ $receipt->verification_code }}</small>
-                </div>
             </div>
 
             <!-- Pickup Information -->

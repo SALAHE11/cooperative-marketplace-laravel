@@ -88,11 +88,15 @@
             margin: 20px 0;
         }
         .verification-code {
-            font-size: 1.8rem;
+            font-size: 2.2rem;
             font-weight: bold;
             color: #0c5460;
-            letter-spacing: 3px;
-            margin: 10px 0;
+            letter-spacing: 4px;
+            margin: 15px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border: 2px solid #17a2b8;
         }
         .validity-section {
             background: #d4edda;
@@ -102,18 +106,30 @@
             text-align: center;
             margin: 20px 0;
         }
-        .qr-placeholder {
-            width: 120px;
-            height: 120px;
-            background: #f8f9fa;
-            border: 2px dashed #dee2e6;
+        .items-section {
+            background: #e9ecef;
+            padding: 20px;
             border-radius: 8px;
+            margin: 20px 0;
+        }
+        .items-section h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        .item-row {
             display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 15px auto;
-            font-size: 0.9rem;
-            color: #666;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .item-row:last-child {
+            border-bottom: none;
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: #28a745;
+            border-top: 2px solid #28a745;
+            padding-top: 10px;
+            margin-top: 10px;
         }
         .footer {
             background: #f8f9fa;
@@ -239,6 +255,21 @@
                 <p>Cette personne est officiellement autorisée à récupérer la commande</p>
             </div>
 
+            <!-- Order Items -->
+            <div class="items-section">
+                <h3>🛒 Articles à Récupérer</h3>
+                @foreach($authReceipt->clientReceipt->order->orderItems as $item)
+                <div class="item-row">
+                    <span>{{ $item->product ? $item->product->name : 'Produit supprimé' }} ({{ $item->quantity }})</span>
+                    <span>{{ number_format($item->subtotal, 2) }} MAD</span>
+                </div>
+                @endforeach
+                <div class="item-row">
+                    <span>TOTAL:</span>
+                    <span>{{ number_format($authReceipt->clientReceipt->total_amount, 2) }} MAD</span>
+                </div>
+            </div>
+
             <!-- Authorization Details -->
             <div class="info-section">
                 <h3>Détails de l'Autorisation</h3>
@@ -294,16 +325,9 @@
 
             <!-- Verification Code -->
             <div class="verification-section">
-                <h3>Code de Vérification</h3>
+                <h3>🔐 Code de Vérification</h3>
                 <div class="verification-code">{{ $authReceipt->unique_code }}</div>
                 <p><strong>Code à présenter à la coopérative</strong></p>
-
-                <!-- QR Code Placeholder -->
-                <div class="qr-placeholder">
-                    QR CODE
-                    <br>
-                    <small>{{ $authReceipt->unique_code }}</small>
-                </div>
             </div>
 
             <!-- Pickup Instructions -->
