@@ -992,20 +992,117 @@
             });
         }
 
+        // FIXED: viewCooperativeDetails function with correct URL
         function viewCooperativeDetails(coopId) {
-            fetch(`{{ url('/cooperatives') }}/${coopId}/details`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
+            console.log('Viewing cooperative details for ID:', coopId);
+
+            // Validate cooperative ID
+            if (!coopId || isNaN(coopId) || coopId <= 0) {
+                console.error('Invalid cooperative ID:', coopId);
+                showErrorInModal('ID de coopérative invalide');
+                return;
+            }
+
+            // Show loading state in modal
+            showLoadingInModal();
+            cooperativeModal.show();
+
+            // FIXED: Use the correct public route
+            const url = `{{ url('/register/cooperative') }}/${coopId}/details`;
+            console.log('Fetching from URL:', url);
+
+            fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => {
+                console.log('Response received:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    ok: response.ok
+                });
+
+                if (!response.ok) {
+                    switch (response.status) {
+                        case 404:
+                            throw new Error('Coopérative introuvable ou non approuvée');
+                        case 403:
+                            throw new Error('Accès non autorisé à cette coopérative');
+                        case 500:
+                            throw new Error('Erreur serveur. Veuillez réessayer plus tard');
+                        default:
+                            throw new Error(`Erreur HTTP ${response.status}: ${response.statusText}`);
+                    }
+                }
+
+                return response.json();
+            })
+            .then(data => {
+                console.log('Response data received:', data);
+
+                if (data.success) {
+                    if (data.cooperative) {
                         displayCooperativeDetails(data.cooperative);
                         selectedCooperativeData = data.cooperative;
-                        cooperativeModal.show();
+                    } else {
+                        throw new Error('Données de coopérative manquantes dans la réponse');
                     }
-                })
-                .catch(error => {
-                    console.error('Details error:', error);
-                    alert('Erreur lors du chargement des détails');
-                });
+                } else {
+                    const errorMessage = data.message || 'Erreur inconnue lors du chargement des détails';
+                    console.error('Server returned error:', errorMessage);
+                    throw new Error(errorMessage);
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching cooperative details:', error);
+
+                let errorMessage = 'Erreur lors du chargement des détails';
+                let additionalInfo = '';
+
+                if (error.message) {
+                    errorMessage = error.message;
+                }
+
+                showErrorInModal(errorMessage, additionalInfo, coopId);
+            });
+        }
+
+        function showLoadingInModal() {
+            const detailsContainer = document.getElementById('cooperativeDetails');
+            detailsContainer.innerHTML = `
+                <div class="text-center p-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Chargement...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Chargement des détails...</p>
+                </div>
+            `;
+        }
+
+        function showErrorInModal(errorMessage, additionalInfo = '', coopId = '') {
+            const detailsContainer = document.getElementById('cooperativeDetails');
+            detailsContainer.innerHTML = `
+                <div class="alert alert-danger">
+                    <h5><i class="fas fa-exclamation-triangle me-2"></i>Erreur</h5>
+                    <p><strong>Message:</strong> ${errorMessage}</p>
+                    ${additionalInfo ? `<p><strong>Information:</strong> ${additionalInfo}</p>` : ''}
+                    ${coopId ? `<p><strong>ID Coopérative:</strong> ${coopId}</p>` : ''}
+                    <hr>
+                    <small class="text-muted">
+                        Si le problème persiste, veuillez rafraîchir la page ou contacter le support.
+                    </small>
+                </div>
+                <div class="text-center mt-3">
+                    <button type="button" class="btn btn-primary" onclick="location.reload()">
+                        <i class="fas fa-redo me-1"></i>
+                        Rafraîchir la page
+                    </button>
+                </div>
+            `;
         }
 
         function displayCooperativeDetails(coop) {

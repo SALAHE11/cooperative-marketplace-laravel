@@ -57,37 +57,7 @@ class CoopRegistrationController extends Controller
         ]);
     }
 
-    // ===== Get cooperative details =====
-    public function getCooperativeDetails($id)
-    {
-        $cooperative = Cooperative::where('id', $id)
-            ->where('status', 'approved')
-            ->select('id', 'name', 'sector_of_activity', 'address', 'phone', 'email', 'date_created', 'logo_path', 'description', 'legal_status')
-            ->first();
-
-        if (!$cooperative) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Coopérative introuvable'
-            ], 404);
-        }
-
-        return response()->json([
-            'success' => true,
-            'cooperative' => [
-                'id' => $cooperative->id,
-                'name' => $cooperative->name,
-                'sector_of_activity' => $cooperative->sector_of_activity,
-                'address' => $cooperative->address,
-                'phone' => $cooperative->phone,
-                'email' => $cooperative->email,
-                'date_created' => $cooperative->date_created->format('d/m/Y'),
-                'description' => $cooperative->description,
-                'legal_status' => $cooperative->legal_status,
-                'logo_url' => $cooperative->logo_path ? Storage::url($cooperative->logo_path) : null,
-            ]
-        ]);
-    }
+    
 
     // ===== Handle both new registration and join requests =====
     public function register(Request $request)
@@ -527,4 +497,79 @@ class CoopRegistrationController extends Controller
             return back()->withErrors(['error' => 'Erreur lors de la vérification: ' . $e->getMessage()]);
         }
     }
+
+    public function getCooperativeDetails($id)
+{
+    try {
+        // Use raw DB query to avoid any model relationship issues
+        $cooperative = DB::table('cooperatives')
+            ->where('id', $id)
+            ->where('status', 'approved')
+            ->select([
+                'id',
+                'name',
+                'sector_of_activity',
+                'address',
+                'phone',
+                'email',
+                'date_created',
+                'logo_path',
+                'description',
+                'legal_status'
+            ])
+            ->first();
+
+        if (!$cooperative) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Coopérative introuvable'
+            ], 404);
+        }
+
+        // Format date safely
+        $dateCreated = 'Non spécifiée';
+        if ($cooperative->date_created) {
+            try {
+                $dateCreated = \Carbon\Carbon::parse($cooperative->date_created)->format('d/m/Y');
+            } catch (\Exception $e) {
+                $dateCreated = 'Non spécifiée';
+            }
+        }
+
+        // Handle logo URL safely
+        $logoUrl = null;
+        if ($cooperative->logo_path) {
+            try {
+                if (Storage::disk('public')->exists($cooperative->logo_path)) {
+                    $logoUrl = Storage::url($cooperative->logo_path);
+                }
+            } catch (\Exception $e) {
+                // Ignore logo errors
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'cooperative' => [
+                'id' => $cooperative->id,
+                'name' => $cooperative->name,
+                'sector_of_activity' => $cooperative->sector_of_activity ?? 'Non spécifié',
+                'address' => $cooperative->address ?? 'Non spécifiée',
+                'phone' => $cooperative->phone ?? 'Non spécifié',
+                'email' => $cooperative->email,
+                'date_created' => $dateCreated,
+                'description' => $cooperative->description ?? '',
+                'legal_status' => $cooperative->legal_status ?? 'Non spécifié',
+                'logo_url' => $logoUrl,
+            ]
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Erreur lors du chargement des détails: ' . $e->getMessage()
+        ], 500);
+    }
+}
+
 }
